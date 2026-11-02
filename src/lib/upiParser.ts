@@ -171,3 +171,4 @@ export function parseUpiPayload(raw: string): ParsedUpiPayload {
     isShortenedUrl: shortened,
   };
 }
+

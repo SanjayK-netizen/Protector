@@ -33,3 +33,4 @@ export const HIGH_RISK_RULE_IDS = CONFIG.highRiskRuleIds;
 export const BASELINE_NOTICE = CONFIG.baselineNotice;
 export const SIMULATION_BANNER_TEXT = CONFIG.simulationBannerText;
 export const DEFAULT_TEST_HANDLE = CONFIG.defaultTestHandle;
+
