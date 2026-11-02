@@ -1,8 +1,9 @@
 [
   {
     "id": "SCEN-01",
+    "context": "shop_counter",
     "title": "Campus Canteen Lunch",
-    "description": "Daily student lunch combo purchase at the official campus canteen.",
+    "description": "Student scans the official QR sticker at the campus canteen counter to pay for a lunch combo.",
     "rawPayload": "upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=120.00&cu=INR&tn=Lunch%20Combo",
     "payeeName": "Campus Canteen",
     "payeeVpa": "canteen@testbank",
@@ -12,8 +13,9 @@
   },
   {
     "id": "SCEN-02",
-    "title": "College Library Printing",
-    "description": "Printing and xerox charges for an engineering lab report at the library.",
+    "context": "college_fee",
+    "title": "College Library Printing Fee",
+    "description": "Student pays for project-report printing at the college library using its official UPI QR.",
     "rawPayload": "upi://pay?pa=library@testbank&pn=College%20Library&am=45.00&cu=INR&tn=Project%20Report%20Print",
     "payeeName": "College Library",
     "payeeVpa": "library@testbank",
@@ -23,47 +25,78 @@
   },
   {
     "id": "SCEN-03",
-    "title": "Campus Bookstore Notebooks",
-    "description": "Purchase of lab notebooks and stationery supplies at the college store.",
-    "rawPayload": "upi://pay?pa=bookstore@testbank&pn=Campus%20Bookstore&am=280.00&cu=INR&tn=Stationery%20Supplies",
-    "payeeName": "Campus Bookstore",
-    "payeeVpa": "bookstore@testbank",
-    "amount": 280.00,
-    "note": "Stationery Supplies",
+    "context": "whatsapp_friend",
+    "title": "Friend Dinner Split via WhatsApp",
+    "description": "Classmate Arjun shares a UPI QR on WhatsApp to settle a restaurant bill split.",
+    "rawPayload": "upi://pay?pa=arjun.kumar@testbank&pn=Arjun%20Kumar&am=150.00&cu=INR&tn=Dinner%20split",
+    "payeeName": "Arjun Kumar",
+    "payeeVpa": "arjun.kumar@testbank",
+    "amount": 150.00,
+    "note": "Dinner split",
     "groundTruth": "safe"
   },
   {
     "id": "SCEN-04",
-    "title": "Hostel Fest Cashback Reward",
-    "description": "A QR shared on WhatsApp claiming instant cashback reward for fest registration.",
+    "context": "employee_vendor",
+    "title": "Hostel Office Maintenance Fee",
+    "description": "Student pays the official hostel-office UPI QR for a registered maintenance service request.",
+    "rawPayload": "upi://pay?pa=hostel.office@testbank&pn=Hostel%20Office&am=350.00&cu=INR&tn=Maintenance%20service",
+    "payeeName": "Hostel Office",
+    "payeeVpa": "hostel.office@testbank",
+    "amount": 350.00,
+    "note": "Maintenance service",
+    "groundTruth": "safe"
+  },
+  {
+    "id": "SCEN-05",
+    "context": "whatsapp_friend",
+    "title": "WhatsApp Cashback-Reward Scam",
+    "description": "A QR forwarded in a hostel WhatsApp group claims the scanner will receive instant cashback. The QR actually debits the user's account.",
     "rawPayload": "upi://pay?pa=cashback.rewards@testbank&pn=Fest%20Cashback&am=500.00&cu=INR&tn=Scan%20to%20receive%20cashback%20refund",
     "payeeName": "Fest Cashback",
     "payeeVpa": "cashback.rewards@testbank",
     "amount": 500.00,
     "note": "Scan to receive cashback refund",
-    "groundTruth": "risky"
-  },
-  {
-    "id": "SCEN-05",
-    "title": "Tampered Canteen Counter Sticker",
-    "description": "A fraudulent sticker pasted over the canteen counter using a look-alike handle.",
-    "rawPayload": "upi://pay?pa=canteenn@testbank&pn=Campus%20Canteen&am=180.00&cu=INR&tn=Lunch%20Combo",
-    "payeeName": "Campus Canteen",
-    "payeeVpa": "canteenn@testbank",
-    "amount": 180.00,
-    "note": "Lunch Combo",
-    "groundTruth": "risky"
+    "groundTruth": "risky",
+    "_triggersRules": [4]
   },
   {
     "id": "SCEN-06",
-    "title": "Exam Fee Verification Link",
-    "description": "A QR link forwarded in a student group directing to an external phishing portal.",
-    "rawPayload": "https://testbank-portal.test/exam-hall-ticket?verify=urgent",
+    "context": "college_fee",
+    "title": "Exam-Fee Phishing Link",
+    "description": "A QR forwarded in a student class group links to an external portal instead of a UPI address, aiming to steal credentials or money.",
+    "rawPayload": "https://testbank-portal.test/exam-hall-ticket?verify=now",
     "payeeName": "Exam Portal Support",
     "payeeVpa": "portal.support@testbank",
     "amount": 1200.00,
-    "note": "Exam fee clearance portal",
-    "groundTruth": "risky"
+    "note": "Exam fee clearance via portal",
+    "groundTruth": "risky",
+    "_triggersRules": [6]
+  },
+  {
+    "id": "SCEN-07",
+    "context": "shop_counter",
+    "title": "Tampered Canteen Sticker — Look-alike with High Amount",
+    "description": "A fraudulent sticker with 'canteenn@testbank' (one extra letter) is placed over the real canteen QR; the amount is inflated well above normal lunch prices.",
+    "rawPayload": "upi://pay?pa=canteenn@testbank&pn=Campus%20Canteen&am=2500.00&cu=INR&tn=Lunch%20Combo",
+    "payeeName": "Campus Canteen",
+    "payeeVpa": "canteenn@testbank",
+    "amount": 2500.00,
+    "note": "Lunch Combo",
+    "groundTruth": "risky",
+    "_triggersRules": [3, 5]
+  },
+  {
+    "id": "SCEN-08",
+    "context": "employee_vendor",
+    "title": "Suspicious Vendor Invoice with Urgency",
+    "description": "An employee receives a payment request from an unrecognized UPI handle; the note uses urgency language to pressure an immediate transfer.",
+    "rawPayload": "upi://pay?pa=vendor.payment@paynow&pn=Vendor%20Payment&am=1500.00&cu=INR&tn=Invoice%20urgent%20payment%20expires%20today",
+    "payeeName": "Vendor Payment",
+    "payeeVpa": "vendor.payment@paynow",
+    "amount": 1500.00,
+    "note": "Invoice urgent payment expires today",
+    "groundTruth": "risky",
+    "_triggersRules": [2, 7]
   }
 ]
-
