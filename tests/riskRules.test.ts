@@ -301,6 +301,16 @@ describe('Rule 6 — Web Links, Shortened URLs & Unsupported Schemes', () => {
     expect(a.verdict).toBe('Risky');
   });
 
+  it('gives non-URL garbage a plain-English invalid UPI reason', () => {
+    const a = assess('not a UPI address or web link');
+    const r = a.triggeredRules.find(rule => rule.id === 6);
+    expect(r).toBeDefined();
+    expect(r!.title).toBe('Invalid QR Payload');
+    expect(r!.reason).toBe('This QR code is not a valid UPI payment code.');
+    expect(r!.reason).not.toContain('web link');
+    expect(a.verdict).toBe('Risky');
+  });
+
   it('triggers for shortened URLs with a specific warning', () => {
     const a = assess('https://bit.ly/pay-fees');
     const r = a.triggeredRules.find(r => r.id === 6);
@@ -377,12 +387,16 @@ describe('Parser Errors in Risk Engine', () => {
     const a = assess('upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=-150.00');
     expect(a.verdict).not.toBe('Safe');
     expect(a.triggeredRules.length).toBeGreaterThanOrEqual(1);
+    expect(a.triggeredRules.find(rule => rule.code === 'INVALID_AMOUNT')?.title).toBe('Invalid amount');
+    expect(a.triggeredRules.some(rule => rule.title === 'Unusually High Payment Amount')).toBe(false);
   });
 
   it('flags non-numeric invalid amount as not Safe', () => {
     const a = assess('upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=abc');
     expect(a.verdict).not.toBe('Safe');
     expect(a.triggeredRules.length).toBeGreaterThanOrEqual(1);
+    expect(a.triggeredRules.find(rule => rule.code === 'INVALID_AMOUNT')?.title).toBe('Invalid amount');
+    expect(a.triggeredRules.some(rule => rule.title === 'Unusually High Payment Amount')).toBe(false);
   });
 });
 
@@ -404,16 +418,16 @@ describe('Neutral Wording Verification', () => {
 // Scenario suite integrity
 // ---------------------------------------------------------------------------
 
-describe('Scenarios Data Set Integrity (8 Scenarios)', () => {
-  it('contains exactly 8 synthetic scenarios', () => {
-    expect(scenarios).toHaveLength(8);
+describe('Scenarios Data Set Integrity (10 Scenarios)', () => {
+  it('contains exactly 10 synthetic scenarios', () => {
+    expect(scenarios).toHaveLength(10);
   });
 
-  it('has exactly 4 safe and 4 risky scenarios', () => {
+  it('has exactly 5 safe and 5 risky scenarios', () => {
     const safe = scenarios.filter(s => s.groundTruth === 'safe');
     const risky = scenarios.filter(s => s.groundTruth === 'risky');
-    expect(safe).toHaveLength(4);
-    expect(risky).toHaveLength(4);
+    expect(safe).toHaveLength(5);
+    expect(risky).toHaveLength(5);
   });
 
   it('covers at least 4 different contexts overall', () => {
@@ -438,9 +452,9 @@ describe('Scenarios Data Set Integrity (8 Scenarios)', () => {
     });
   });
 
-  it('rules 1, 2, 5 and 7 appear in at least one risky scenario alongside 3, 4, 6', () => {
+  it('rules 1, 3, 4, 5, 6 and 7 appear in engine-detectable risky scenarios', () => {
     const triggeredInRisky = new Set<number>();
-    const riskyScens = scenarios.filter(s => s.groundTruth === 'risky');
+    const riskyScens = scenarios.filter(s => s.groundTruth === 'risky' && !s.knownLimitation);
 
     riskyScens.forEach(s => {
       const payload = parseUpiPayload(s.rawPayload);
@@ -448,7 +462,7 @@ describe('Scenarios Data Set Integrity (8 Scenarios)', () => {
       assessment.triggeredRules.forEach(r => triggeredInRisky.add(r.id));
     });
 
-    [1, 2, 3, 4, 5, 6, 7].forEach(ruleId => {
+    [1, 3, 4, 5, 6, 7].forEach(ruleId => {
       expect(
         triggeredInRisky.has(ruleId),
         `Rule ${ruleId} did not appear in any risky scenario`
@@ -467,8 +481,8 @@ describe('Scenario ground-truth vs computed verdict', () => {
     risky: 'Risky',
   };
 
-  it('every SAFE scenario triggers 0 rules and gets verdict "Safe"', () => {
-    const safeScens = scenarios.filter(s => s.groundTruth === 'safe');
+  it('every ordinary SAFE scenario triggers 0 rules and gets verdict "Safe"', () => {
+    const safeScens = scenarios.filter(s => s.groundTruth === 'safe' && s.id !== 'SCEN-09');
     safeScens.forEach(s => {
       const payload = parseUpiPayload(s.rawPayload);
       const a = evaluateRisk(payload, OPTS, s.context as UserContext);
@@ -480,8 +494,8 @@ describe('Scenario ground-truth vs computed verdict', () => {
     });
   });
 
-  it('every RISKY scenario triggers ≥1 rule and gets verdict "Risky"', () => {
-    const riskyScens = scenarios.filter(s => s.groundTruth === 'risky');
+  it('every engine-detectable RISKY scenario triggers ≥1 rule and gets verdict "Risky"', () => {
+    const riskyScens = scenarios.filter(s => s.groundTruth === 'risky' && !s.knownLimitation);
     riskyScens.forEach(s => {
       const payload = parseUpiPayload(s.rawPayload);
       const a = evaluateRisk(payload, OPTS, s.context as UserContext);
@@ -510,10 +524,12 @@ describe('Scenario ground-truth vs computed verdict', () => {
     expect(a.verdict).toBe('Safe');
   });
 
-  it('SCEN-05 (cashback scam) triggers Rule 4', () => {
+  it('SCEN-05 (order adjustment) triggers only Rule 4 for mild refund wording', () => {
     const s = scenarios.find(s => s.id === 'SCEN-05')!;
     const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
-    expect(a.triggeredRules.some(r => r.id === 4)).toBe(true);
+    expect(s.note).toMatch(/refund/i);
+    expect(s.payeeName).not.toMatch(/cashback/i);
+    expect(a.triggeredRules.map(r => r.id)).toEqual([4]);
   });
 
   it('SCEN-06 (phishing link) triggers Rule 6', () => {
@@ -529,11 +545,29 @@ describe('Scenario ground-truth vs computed verdict', () => {
     expect(a.triggeredRules.some(r => r.id === 5)).toBe(true);
   });
 
-  it('SCEN-08 (unknown handle + urgency + name mismatch) triggers Rules 1, 2, 7', () => {
+  it('SCEN-08 (look-alike vendor address + urgency + name mismatch) triggers Rules 1, 3, 7', () => {
     const s = scenarios.find(s => s.id === 'SCEN-08')!;
     const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
     expect(a.triggeredRules.some(r => r.id === 1)).toBe(true);
-    expect(a.triggeredRules.some(r => r.id === 2)).toBe(true);
+    expect(a.triggeredRules.some(r => r.id === 3)).toBe(true);
     expect(a.triggeredRules.some(r => r.id === 7)).toBe(true);
+  });
+
+  it('SCEN-09 returns Check first for exactly one medium amount rule in merchant context', () => {
+    const s = scenarios.find(s => s.id === 'SCEN-09')!;
+    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
+    expect(s.context).toBe('merchant');
+    expect(a.verdict).toBe('Check first');
+    expect(a.triggeredRules).toHaveLength(1);
+    expect(a.triggeredRules[0].id).toBe(5);
+    expect(a.triggeredRules[0].severity).toBe('medium');
+  });
+
+  it('SCEN-10 is a known limitation: an exact trusted VPA copy returns Safe', () => {
+    const s = scenarios.find(s => s.id === 'SCEN-10')!;
+    expect(s.knownLimitation).toBe(true);
+    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
+    expect(a.verdict).toBe('Safe');
+    expect(a.triggeredRules).toHaveLength(0);
   });
 });

@@ -221,14 +221,18 @@ export function evaluateRisk(
       reason = payload.error;
     } else if (payload.isShortenedUrl) {
       reason = `The QR contains a shortened URL ('${payload.raw}') that hides the real destination — do not follow it.`;
-    } else {
+    } else if (payload.isUrl) {
       reason = `The QR contains a web link ('${payload.raw}') instead of a direct UPI payment address.`;
+    } else {
+      reason = 'This QR code is not a valid UPI payment code.';
     }
 
     triggeredRules.push({
       id: 6,
       code: 'NON_UPI_OR_URL',
-      title: 'Web Link or Shortened URL',
+      title: payload.isUrl || payload.isShortenedUrl
+        ? 'Web Link or Shortened URL'
+        : 'Invalid QR Payload',
       reason,
       severity: 'high',
     });
@@ -252,7 +256,7 @@ export function evaluateRisk(
       triggeredRules.push({
         id: 5,
         code: 'INVALID_AMOUNT',
-        title: 'Invalid Payment Amount',
+        title: 'Invalid amount',
         reason: payload.error,
         severity: 'high',
       });
