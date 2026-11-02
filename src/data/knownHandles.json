@@ -1,0 +1,30 @@
+{
+  "knownHandles": [
+    "testbank",
+    "studentbank",
+    "campusbank",
+    "oktestbank"
+  ],
+  "trustedPayees": [
+    {
+      "name": "Campus Canteen",
+      "vpa": "canteen@testbank",
+      "category": "Food Services"
+    },
+    {
+      "name": "College Library",
+      "vpa": "library@testbank",
+      "category": "Academic Services"
+    },
+    {
+      "name": "Campus Bookstore",
+      "vpa": "bookstore@testbank",
+      "category": "Supplies"
+    },
+    {
+      "name": "Hostel Office",
+      "vpa": "hostel.office@testbank",
+      "category": "Administration"
+    }
+  ]
+}

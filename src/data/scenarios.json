@@ -1,0 +1,68 @@
+[
+  {
+    "id": "SCEN-01",
+    "title": "Campus Canteen Lunch",
+    "description": "Daily student lunch combo purchase at the official campus canteen.",
+    "rawPayload": "upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=120.00&cu=INR&tn=Lunch%20Combo",
+    "payeeName": "Campus Canteen",
+    "payeeVpa": "canteen@testbank",
+    "amount": 120.00,
+    "note": "Lunch Combo",
+    "groundTruth": "safe"
+  },
+  {
+    "id": "SCEN-02",
+    "title": "College Library Printing",
+    "description": "Printing and xerox charges for an engineering lab report at the library.",
+    "rawPayload": "upi://pay?pa=library@testbank&pn=College%20Library&am=45.00&cu=INR&tn=Project%20Report%20Print",
+    "payeeName": "College Library",
+    "payeeVpa": "library@testbank",
+    "amount": 45.00,
+    "note": "Project Report Print",
+    "groundTruth": "safe"
+  },
+  {
+    "id": "SCEN-03",
+    "title": "Campus Bookstore Notebooks",
+    "description": "Purchase of lab notebooks and stationery supplies at the college store.",
+    "rawPayload": "upi://pay?pa=bookstore@testbank&pn=Campus%20Bookstore&am=280.00&cu=INR&tn=Stationery%20Supplies",
+    "payeeName": "Campus Bookstore",
+    "payeeVpa": "bookstore@testbank",
+    "amount": 280.00,
+    "note": "Stationery Supplies",
+    "groundTruth": "safe"
+  },
+  {
+    "id": "SCEN-04",
+    "title": "Hostel Fest Cashback Reward",
+    "description": "A QR shared on WhatsApp claiming instant cashback reward for fest registration.",
+    "rawPayload": "upi://pay?pa=cashback.rewards@testbank&pn=Fest%20Cashback&am=500.00&cu=INR&tn=Scan%20to%20receive%20cashback%20refund",
+    "payeeName": "Fest Cashback",
+    "payeeVpa": "cashback.rewards@testbank",
+    "amount": 500.00,
+    "note": "Scan to receive cashback refund",
+    "groundTruth": "risky"
+  },
+  {
+    "id": "SCEN-05",
+    "title": "Tampered Canteen Counter Sticker",
+    "description": "A fraudulent sticker pasted over the canteen counter using a look-alike handle.",
+    "rawPayload": "upi://pay?pa=canteenn@testbank&pn=Campus%20Canteen&am=180.00&cu=INR&tn=Lunch%20Combo",
+    "payeeName": "Campus Canteen",
+    "payeeVpa": "canteenn@testbank",
+    "amount": 180.00,
+    "note": "Lunch Combo",
+    "groundTruth": "risky"
+  },
+  {
+    "id": "SCEN-06",
+    "title": "Exam Fee Verification Link",
+    "description": "A QR link forwarded in a student group directing to an external phishing portal.",
+    "rawPayload": "https://testbank-portal.test/exam-hall-ticket?verify=urgent",
+    "payeeName": "Exam Portal Support",
+    "payeeVpa": "portal.support@testbank",
+    "amount": 1200.00,
+    "note": "Exam fee clearance portal",
+    "groundTruth": "risky"
+  }
+]
