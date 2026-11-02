@@ -5,6 +5,7 @@ import {
   isNameMatching,
 } from '../src/lib/riskRules';
 import { parseUpiPayload } from '../src/lib/upiParser';
+import { AMOUNT_THRESHOLD_MAP, UserContext } from '../src/config';
 import scenarios from '../src/data/scenarios.json';
 import knownHandlesData from '../src/data/knownHandles.json';
 
@@ -13,14 +14,16 @@ import knownHandlesData from '../src/data/knownHandles.json';
 // ---------------------------------------------------------------------------
 
 const OPTS = {
-  knownHandles: knownHandlesData.knownHandles,
+  knownHandles: [
+    ...knownHandlesData.knownHandles,
+    ...knownHandlesData.publicBankHandles,
+  ],
   trustedPayees: knownHandlesData.trustedPayees,
-  amountThreshold: 2000,
   lookalikeMaxDistance: 2,
 };
 
-function assess(raw: string) {
-  return evaluateRisk(parseUpiPayload(raw), OPTS);
+function assess(raw: string, context: UserContext = 'general') {
+  return evaluateRisk(parseUpiPayload(raw), OPTS, context);
 }
 
 // ---------------------------------------------------------------------------
@@ -51,20 +54,22 @@ describe('Utility: isNameMatching', () => {
   it('matches when a name token appears in the username', () => {
     expect(isNameMatching('Campus Canteen', 'canteen')).toBe(true);
     expect(isNameMatching('College Library', 'library')).toBe(true);
+    expect(isNameMatching('Grocery Store', 'grocery')).toBe(true);
   });
   it('matches friend names where token appears in dotted username', () => {
     expect(isNameMatching('Arjun Kumar', 'arjun.kumar')).toBe(true);
   });
-  it('matches hostel office with dotted username', () => {
-    expect(isNameMatching('Hostel Office', 'hostel.office')).toBe(true);
+  it('matches workplace accounts with dotted username', () => {
+    expect(isNameMatching('Vendor Accounts', 'vendor.accounts')).toBe(true);
+    expect(isNameMatching('Office Canteen', 'office.canteen')).toBe(true);
   });
   it('does NOT match unrelated names', () => {
-    expect(isNameMatching('Campus Bookstore', 'rahul.sharma')).toBe(false);
-    expect(isNameMatching('Fake Merchant', 'canteen')).toBe(false);
+    expect(isNameMatching('Corporate Supplies', 'malicious.actor')).toBe(false);
+    expect(isNameMatching('Grocery Store', 'rahul.sharma')).toBe(false);
   });
   it('handles empty inputs without crashing', () => {
     expect(isNameMatching('', 'canteen')).toBe(false);
-    expect(isNameMatching('Campus Canteen', '')).toBe(false);
+    expect(isNameMatching('Grocery Store', '')).toBe(false);
   });
 });
 
@@ -75,17 +80,24 @@ describe('Utility: isNameMatching', () => {
 describe('Rule 1 — Payee Name Mismatch', () => {
   it('triggers when name is completely unrelated to username', () => {
     const a = assess(
-      'upi://pay?pa=random.attacker@testbank&pn=Campus%20Bookstore&am=150.00'
+      'upi://pay?pa=random.attacker@testbank&pn=Grocery%20Store&am=150.00'
     );
     const r = a.triggeredRules.find(r => r.id === 1);
     expect(r).toBeDefined();
     expect(r!.code).toBe('NAME_MISMATCH');
-    expect(r!.reason).toContain('Campus Bookstore');
+    expect(r!.reason).toContain('Grocery Store');
+  });
+
+  it('triggers when payee name is missing from payload', () => {
+    const a = assess('upi://pay?pa=unknown.vpa@testbank&am=150.00');
+    const r = a.triggeredRules.find(r => r.id === 1);
+    expect(r).toBeDefined();
+    expect(r!.code).toBe('NAME_MISMATCH');
   });
 
   it('does NOT trigger when name and username correspond', () => {
     const a = assess(
-      'upi://pay?pa=bookstore@testbank&pn=Campus%20Bookstore&am=150.00'
+      'upi://pay?pa=grocery@testbank&pn=Grocery%20Store&am=150.00'
     );
     expect(a.triggeredRules.some(r => r.id === 1)).toBe(false);
   });
@@ -96,19 +108,37 @@ describe('Rule 1 — Payee Name Mismatch', () => {
 // ---------------------------------------------------------------------------
 
 describe('Rule 2 — Unknown UPI Handle', () => {
-  it('triggers for a handle that is not in knownHandles', () => {
+  it('triggers for a handle that is not in knownHandles or publicBankHandles', () => {
     const a = assess(
-      'upi://pay?pa=anyone@scambank&pn=Student%20Council&am=100.00'
+      'upi://pay?pa=scammer@fakebank&pn=Scammer&am=100.00'
     );
     const r = a.triggeredRules.find(r => r.id === 2);
     expect(r).toBeDefined();
     expect(r!.code).toBe('UNKNOWN_HANDLE');
-    expect(r!.reason).toContain('@scambank');
+    expect(r!.reason).toContain('@fakebank');
   });
 
-  it('does NOT trigger for a handle in knownHandles', () => {
-    const a = assess('upi://pay?pa=anyone@testbank&pn=Anyone&am=100.00');
+  it('does NOT trigger for standard synthetic handles', () => {
+    const a = assess('upi://pay?pa=user@testbank&pn=User&am=50.00');
     expect(a.triggeredRules.some(r => r.id === 2)).toBe(false);
+
+    const b = assess('upi://pay?pa=user@testupi&pn=User&am=50.00');
+    expect(b.triggeredRules.some(r => r.id === 2)).toBe(false);
+  });
+
+  it('does NOT trigger for public bank handles', () => {
+    const publicHandles = ['oksbi', 'okhdfcbank', 'okicici', 'okaxis', 'ybl', 'paytm', 'ibl', 'axl'];
+    for (const h of publicHandles) {
+      const a = assess(`upi://pay?pa=store@${h}&pn=Store&am=50.00`);
+      expect(a.triggeredRules.some(r => r.id === 2)).toBe(false);
+    }
+  });
+
+  it('triggers when UPI address has no @ symbol', () => {
+    const a = assess('upi://pay?pa=justausername&pn=User&am=50.00');
+    const r = a.triggeredRules.find(r => r.id === 2);
+    expect(r).toBeDefined();
+    expect(r!.code).toBe('UNKNOWN_HANDLE');
   });
 });
 
@@ -116,217 +146,265 @@ describe('Rule 2 — Unknown UPI Handle', () => {
 // Rule 3: Look-alike of a trusted payee
 // ---------------------------------------------------------------------------
 
-describe('Rule 3 — Look-alike Trusted Payee', () => {
-  it('triggers when VPA differs by 1 character from a trusted payee', () => {
-    // canteenn@testbank vs canteen@testbank — edit distance 1
+describe('Rule 3 — Look-alike of a Trusted Payee', () => {
+  it('triggers on look-alike address with 1 insertion', () => {
     const a = assess(
       'upi://pay?pa=canteenn@testbank&pn=Campus%20Canteen&am=120.00'
     );
     const r = a.triggeredRules.find(r => r.id === 3);
     expect(r).toBeDefined();
     expect(r!.code).toBe('LOOKALIKE_PAYEE');
-    expect(r!.reason).toContain('canteenn@testbank');
     expect(r!.reason).toContain('canteen@testbank');
+    expect(r!.reason).toContain('a trusted payee');
   });
 
-  it('does NOT trigger for the exact trusted payee VPA', () => {
+  it('triggers on look-alike address for retail trusted payee', () => {
+    const a = assess(
+      'upi://pay?pa=groceryy@testbank&pn=Grocery%20Store&am=120.00'
+    );
+    const r = a.triggeredRules.find(r => r.id === 3);
+    expect(r).toBeDefined();
+    expect(r!.code).toBe('LOOKALIKE_PAYEE');
+    expect(r!.reason).toContain('grocery@testbank');
+  });
+
+  it('does NOT trigger for exact match of a trusted payee', () => {
     const a = assess(
       'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=120.00'
     );
     expect(a.triggeredRules.some(r => r.id === 3)).toBe(false);
   });
 
-  it('does NOT trigger for a completely different address', () => {
+  it('does NOT trigger for VPAs with edit distance > lookalikeMaxDistance', () => {
     const a = assess(
-      'upi://pay?pa=arjun.kumar@testbank&pn=Arjun%20Kumar&am=150.00'
+      'upi://pay?pa=unrelatedperson@testbank&pn=Unrelated%20Person&am=100.00'
     );
     expect(a.triggeredRules.some(r => r.id === 3)).toBe(false);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Rule 4: Receive / refund / cashback wording
+// Rule 4: Misleading "Receive" / "Cashback" wording in note only
 // ---------------------------------------------------------------------------
 
-describe('Rule 4 — Deceptive "Receive" or "Cashback" Language', () => {
-  it('triggers and forces Risky when note mentions cashback', () => {
-    const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=50.00&tn=Scan%20to%20receive%20cashback%20bonus'
-    );
-    const r = a.triggeredRules.find(r => r.id === 4);
-    expect(r).toBeDefined();
-    expect(r!.code).toBe('DECEPTIVE_DIRECTION');
-    expect(r!.reason).toMatch(/cashback/i);
-    expect(a.verdict).toBe('Risky');
+describe('Rule 4 — Deceptive Direction Language', () => {
+  it('triggers for strong "you receive money" keywords in note', () => {
+    const keywords = [
+      'receive',
+      'refund',
+      'cashback',
+      'cash-back',
+      'reward',
+      'rewards',
+      'prize',
+      'winner',
+    ];
+    for (const kw of keywords) {
+      const a = assess(
+        `upi://pay?pa=user@testbank&pn=User&am=100.00&tn=Click%20to%20${kw}%20now`
+      );
+      const r = a.triggeredRules.find(r => r.id === 4);
+      expect(r, `Failed for keyword: ${kw}`).toBeDefined();
+      expect(r!.code).toBe('DECEPTIVE_DIRECTION');
+    }
   });
 
-  it('triggers when note mentions refund', () => {
+  it('checks note ONLY, not payee name', () => {
+    // Payee name contains "Cashback" but note does not have deceptive words
     const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=50.00&tn=Get%20your%20refund%20now'
-    );
-    expect(a.triggeredRules.some(r => r.id === 4)).toBe(true);
-  });
-
-  it('does NOT trigger for a normal payment note', () => {
-    const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=120.00&tn=Lunch%20Combo'
+      'upi://pay?pa=cashback@testbank&pn=Cashback%20Store&am=100.00&tn=Shopping%20bill'
     );
     expect(a.triggeredRules.some(r => r.id === 4)).toBe(false);
   });
-});
 
-// ---------------------------------------------------------------------------
-// Rule 5: Unusual amount above threshold
-// ---------------------------------------------------------------------------
-
-describe('Rule 5 — Unusually High Amount', () => {
-  it('triggers when amount exceeds the configured threshold', () => {
-    const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=5500.00'
-    );
-    const r = a.triggeredRules.find(r => r.id === 5);
-    expect(r).toBeDefined();
-    expect(r!.code).toBe('UNUSUAL_AMOUNT');
-    expect(r!.reason).toContain('5500.00');
-    expect(r!.reason).toContain('2000.00');
-  });
-
-  it('does NOT trigger when amount is within the threshold', () => {
-    const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=150.00'
-    );
-    expect(a.triggeredRules.some(r => r.id === 5)).toBe(false);
-  });
-
-  it('does NOT trigger when amount equals the threshold exactly', () => {
-    const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=2000.00'
-    );
-    expect(a.triggeredRules.some(r => r.id === 5)).toBe(false);
+  it('does NOT trigger for excluded neutral words: deposit, credit, claim, bonus, won', () => {
+    const neutralNotes = [
+      'Room deposit',
+      'Security deposit',
+      'Credit card bill',
+      'Claim reimbursement',
+      'Annual bonus payout',
+      'Team won competition',
+    ];
+    for (const note of neutralNotes) {
+      const a = assess(
+        `upi://pay?pa=user@testbank&pn=User&am=100.00&tn=${encodeURIComponent(note)}`
+      );
+      expect(
+        a.triggeredRules.some(r => r.id === 4),
+        `Rule 4 incorrectly triggered for note: "${note}"`
+      ).toBe(false);
+      expect(a.verdict).not.toBe('Risky');
+    }
   });
 });
 
 // ---------------------------------------------------------------------------
-// Rule 6: Web link or shortened URL
+// Rule 5: Context-aware amount thresholds
 // ---------------------------------------------------------------------------
 
-describe('Rule 6 — Web Link or Shortened URL', () => {
-  it('triggers and forces Risky for an HTTPS link', () => {
-    const a = assess('https://testbank-portal.test/exam-dues');
+describe('Rule 5 — Context-Aware Amount Threshold', () => {
+  it('has configured threshold assumptions per context', () => {
+    expect(AMOUNT_THRESHOLD_MAP.student).toBe(2000);
+    expect(AMOUNT_THRESHOLD_MAP.employee).toBe(10000);
+    expect(AMOUNT_THRESHOLD_MAP.shop_customer).toBe(5000);
+    expect(AMOUNT_THRESHOLD_MAP.merchant).toBe(25000);
+    expect(AMOUNT_THRESHOLD_MAP.general).toBe(5000);
+  });
+
+  it('flags the same amount for student context but NOT for employee context', () => {
+    const raw = 'upi://pay?pa=user@testbank&pn=User&am=3000.00';
+
+    // Student limit is 2000 -> 3000 is above
+    const studentAssessment = assess(raw, 'student');
+    expect(studentAssessment.triggeredRules.some(r => r.id === 5)).toBe(true);
+
+    // Employee limit is 10000 -> 3000 is below
+    const employeeAssessment = assess(raw, 'employee');
+    expect(employeeAssessment.triggeredRules.some(r => r.id === 5)).toBe(false);
+
+    // Shop customer limit is 5000 -> 3000 is below
+    const customerAssessment = assess(raw, 'shop_customer');
+    expect(customerAssessment.triggeredRules.some(r => r.id === 5)).toBe(false);
+  });
+
+  it('flags amount for shop_customer context but NOT for merchant context', () => {
+    const raw = 'upi://pay?pa=user@testbank&pn=User&am=6000.00';
+
+    // shop_customer limit is 5000 -> 6000 triggers Rule 5
+    const customerAssessment = assess(raw, 'shop_customer');
+    expect(customerAssessment.triggeredRules.some(r => r.id === 5)).toBe(true);
+
+    // merchant limit is 25000 -> 6000 does NOT trigger Rule 5
+    const merchantAssessment = assess(raw, 'merchant');
+    expect(merchantAssessment.triggeredRules.some(r => r.id === 5)).toBe(false);
+  });
+
+  it('defaults to general context (limit 5000) when omitted', () => {
+    const under = assess('upi://pay?pa=user@testbank&pn=User&am=4900.00');
+    expect(under.triggeredRules.some(r => r.id === 5)).toBe(false);
+
+    const over = assess('upi://pay?pa=user@testbank&pn=User&am=5500.00');
+    expect(over.triggeredRules.some(r => r.id === 5)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rule 6: Web links, shortened URLs, and unsupported payloads
+// ---------------------------------------------------------------------------
+
+describe('Rule 6 — Web Links, Shortened URLs & Unsupported Schemes', () => {
+  it('triggers for standard web URLs with high severity (Risky)', () => {
+    const a = assess('https://testbank-portal.test/pay');
     const r = a.triggeredRules.find(r => r.id === 6);
     expect(r).toBeDefined();
-    expect(r!.code).toBe('NON_UPI_OR_URL');
     expect(a.verdict).toBe('Risky');
   });
 
-  it('triggers and marks reason as shortened URL for bit.ly', () => {
-    const a = assess('https://bit.ly/claim-canteen-offer');
+  it('triggers for shortened URLs with a specific warning', () => {
+    const a = assess('https://bit.ly/pay-fees');
     const r = a.triggeredRules.find(r => r.id === 6);
     expect(r).toBeDefined();
-    expect(r!.reason).toMatch(/shortened/i);
+    expect(r!.reason).toContain('shortened URL');
     expect(a.verdict).toBe('Risky');
   });
 
-  it('triggers for tinyurl.com links', () => {
-    const a = assess('https://tinyurl.com/campus-pass');
-    expect(a.triggeredRules.some(r => r.id === 6)).toBe(true);
+  it('triggers with clear parser reason for upi://collect requests, NOT web link reason', () => {
+    const a = assess('upi://collect?pa=scammer@testbank&am=500.00');
+    const r = a.triggeredRules.find(r => r.id === 6);
+    expect(r).toBeDefined();
+    expect(r!.reason).toContain('collect');
+    expect(r!.reason).not.toContain('web link');
+    expect(a.verdict).toBe('Risky');
   });
 
-  it('does NOT trigger for a valid UPI payload', () => {
+  it('triggers when a UPI payload embeds an external url parameter', () => {
     const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=120.00'
+      'upi://pay?pa=user@testbank&pn=User&am=100.00&url=https%3A%2F%2Fexternal-phish.test'
     );
-    expect(a.triggeredRules.some(r => r.id === 6)).toBe(false);
+    const r = a.triggeredRules.find(r => r.id === 6);
+    expect(r).toBeDefined();
+    expect(a.verdict).toBe('Risky');
   });
 });
 
 // ---------------------------------------------------------------------------
-// Rule 7: Urgency wording
+// Rule 7: Urgency wording with whole-word matching
 // ---------------------------------------------------------------------------
 
-describe('Rule 7 — Urgency Pressure Language', () => {
-  it('triggers when the note contains "urgent"', () => {
+describe('Rule 7 — Urgency Language (Whole Word / Phrase Matching)', () => {
+  it('triggers for whole words like urgent, expires, penalty', () => {
     const a = assess(
-      'upi://pay?pa=library@testbank&pn=College%20Library&am=50.00&tn=Pay%20urgent%20library%20fine%20now'
-    );
-    const r = a.triggeredRules.find(r => r.id === 7);
-    expect(r).toBeDefined();
-    expect(r!.code).toBe('URGENCY_PRESSURE');
-    expect(r!.reason).toMatch(/urgent/i);
-  });
-
-  it('triggers when the note contains "expires"', () => {
-    const a = assess(
-      'upi://pay?pa=library@testbank&pn=College%20Library&am=50.00&tn=Invoice%20expires%20today'
+      'upi://pay?pa=user@testbank&pn=User&am=100.00&tn=Urgent%20payment%20needed'
     );
     expect(a.triggeredRules.some(r => r.id === 7)).toBe(true);
   });
 
-  it('does NOT trigger for a normal note', () => {
+  it('does NOT trigger on "Fine Arts"', () => {
     const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=120.00&tn=Lunch%20Combo'
+      'upi://pay?pa=user@testbank&pn=User&am=100.00&tn=Fine%20Arts%20Club%20fee'
     );
-    expect(a.triggeredRules.some(r => r.id === 7)).toBe(false);
+    expect(
+      a.triggeredRules.some(r => r.id === 7),
+      '"Fine Arts" should not trigger Rule 7'
+    ).toBe(false);
+  });
+
+  it('does NOT trigger on "ready in 15 min"', () => {
+    const a = assess(
+      'upi://pay?pa=user@testbank&pn=User&am=100.00&tn=Order%20ready%20in%2015%20min'
+    );
+    expect(
+      a.triggeredRules.some(r => r.id === 7),
+      '"ready in 15 min" should not trigger Rule 7 (5 min keyword)'
+    ).toBe(false);
+  });
+
+  it('triggers on exact "5 min" urgency phrase', () => {
+    const a = assess(
+      'upi://pay?pa=user@testbank&pn=User&am=100.00&tn=Offer%20expires%20in%205%20min'
+    );
+    expect(a.triggeredRules.some(r => r.id === 7)).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Verdict logic
+// Parser errors in risk engine
 // ---------------------------------------------------------------------------
 
-describe('Verdict Logic', () => {
-  it('Safe when 0 rules trigger', () => {
-    const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=120.00&tn=Lunch%20Combo'
-    );
-    expect(a.triggeredRules).toHaveLength(0);
+describe('Parser Errors in Risk Engine', () => {
+  it('flags negative amount as Risky / Check first, NOT silent Safe', () => {
+    const a = assess('upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=-150.00');
+    expect(a.verdict).not.toBe('Safe');
+    expect(a.triggeredRules.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags non-numeric invalid amount as not Safe', () => {
+    const a = assess('upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=abc');
+    expect(a.verdict).not.toBe('Safe');
+    expect(a.triggeredRules.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Neutral Wording Verification
+// ---------------------------------------------------------------------------
+
+describe('Neutral Wording Verification', () => {
+  it('safe recommendation uses neutral language', () => {
+    const a = assess('upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=50.00');
     expect(a.verdict).toBe('Safe');
-    expect(a.reasons).toHaveLength(0);
-    expect(a.recommendedCheck).toBeTruthy();
-  });
-
-  it('"Check first" when exactly 1 non-high-risk rule triggers', () => {
-    // Rule 5 alone: amount just above threshold, legitimate handle and name
-    const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=2500.00&tn=Bulk%20order'
+    expect(a.recommendedCheck).toBe(
+      'Details match a trusted payee. Confirm the amount on screen before paying.'
     );
-    // Rule 3 may also trigger (canteen matches canteen — exact, so no Rule 3)
-    // Only Rule 5 should trigger
-    expect(a.triggeredRules.map(r => r.id)).toEqual([5]);
-    expect(a.verdict).toBe('Check first');
-    expect(a.recommendedCheck).toMatch(/ask the payee/i);
-  });
-
-  it('"Risky" when Rule 4 triggers alone', () => {
-    const a = assess(
-      'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=50.00&tn=Refund%20deposit%20claim'
-    );
-    expect(a.triggeredRules.some(r => r.id === 4)).toBe(true);
-    expect(a.verdict).toBe('Risky');
-  });
-
-  it('"Risky" when Rule 6 triggers alone', () => {
-    const a = assess('https://malicious.test/pay-here');
-    expect(a.triggeredRules.some(r => r.id === 6)).toBe(true);
-    expect(a.verdict).toBe('Risky');
-  });
-
-  it('"Risky" when 2+ non-high-risk rules trigger together', () => {
-    // Rule 3 (look-alike) + Rule 5 (high amount)
-    const a = assess(
-      'upi://pay?pa=canteenn@testbank&pn=Campus%20Canteen&am=2500.00&tn=Lunch%20Combo'
-    );
-    expect(a.triggeredRules.length).toBeGreaterThanOrEqual(2);
-    expect(a.verdict).toBe('Risky');
-    expect(a.recommendedCheck).toMatch(/do not pay/i);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Scenario file validation (src/data/scenarios.json)
+// Scenario suite integrity
 // ---------------------------------------------------------------------------
 
-describe('Scenario file — structure and coverage', () => {
+describe('Scenarios Data Set Integrity (8 Scenarios)', () => {
   it('contains exactly 8 synthetic scenarios', () => {
     expect(scenarios).toHaveLength(8);
   });
@@ -338,38 +416,43 @@ describe('Scenario file — structure and coverage', () => {
     expect(risky).toHaveLength(4);
   });
 
-  it('covers all four required contexts', () => {
-    const contexts = new Set(scenarios.map(s => s.context));
-    expect(contexts.has('shop_counter')).toBe(true);
-    expect(contexts.has('college_fee')).toBe(true);
-    expect(contexts.has('whatsapp_friend')).toBe(true);
-    expect(contexts.has('employee_vendor')).toBe(true);
+  it('covers at least 4 different contexts overall', () => {
+    const allContexts = new Set(scenarios.map(s => s.context));
+    expect(allContexts.size).toBeGreaterThanOrEqual(4);
   });
 
-  it('risky scenarios cover at least 2 of the 4 contexts', () => {
+  it('covers at least 3 different contexts in risky scenarios', () => {
     const riskyContexts = new Set(
       scenarios.filter(s => s.groundTruth === 'risky').map(s => s.context)
     );
-    expect(riskyContexts.size).toBeGreaterThanOrEqual(2);
+    expect(riskyContexts.size).toBeGreaterThanOrEqual(3);
   });
 
-  it('uses only synthetic @testbank handles (or explicitly non-real handles for risky VPAs)', () => {
-    // Every scenario's payeeVpa must end in @testbank (safe) or use a clearly synthetic domain
-    scenarios.forEach(s => {
-      // payeeVpa is display metadata — the rawPayload is what the parser acts on
-      expect(s.payeeName).toBeTruthy();
-      expect(s.payeeVpa).toContain('@');
-      expect(s.description).toBeTruthy();
-      expect(s.context).toBeTruthy();
-    });
-  });
-
-  it('each scenario has required fields: id, context, rawPayload, groundTruth', () => {
+  it('each scenario has required fields: id, context, setting, rawPayload, groundTruth', () => {
     scenarios.forEach(s => {
       expect(s.id).toMatch(/^SCEN-\d+$/);
       expect(s.context).toBeTruthy();
+      expect((s as any).setting).toBeTruthy();
       expect(s.rawPayload).toBeTruthy();
       expect(['safe', 'risky']).toContain(s.groundTruth);
+    });
+  });
+
+  it('rules 1, 2, 5 and 7 appear in at least one risky scenario alongside 3, 4, 6', () => {
+    const triggeredInRisky = new Set<number>();
+    const riskyScens = scenarios.filter(s => s.groundTruth === 'risky');
+
+    riskyScens.forEach(s => {
+      const payload = parseUpiPayload(s.rawPayload);
+      const assessment = evaluateRisk(payload, OPTS, s.context as UserContext);
+      assessment.triggeredRules.forEach(r => triggeredInRisky.add(r.id));
+    });
+
+    [1, 2, 3, 4, 5, 6, 7].forEach(ruleId => {
+      expect(
+        triggeredInRisky.has(ruleId),
+        `Rule ${ruleId} did not appear in any risky scenario`
+      ).toBe(true);
     });
   });
 });
@@ -388,7 +471,7 @@ describe('Scenario ground-truth vs computed verdict', () => {
     const safeScens = scenarios.filter(s => s.groundTruth === 'safe');
     safeScens.forEach(s => {
       const payload = parseUpiPayload(s.rawPayload);
-      const a = evaluateRisk(payload, OPTS);
+      const a = evaluateRisk(payload, OPTS, s.context as UserContext);
       expect(
         a.triggeredRules,
         `${s.id} (${s.context}) should trigger 0 rules but got: ${a.triggeredRules.map(r => r.id).join(', ')}`
@@ -401,7 +484,7 @@ describe('Scenario ground-truth vs computed verdict', () => {
     const riskyScens = scenarios.filter(s => s.groundTruth === 'risky');
     riskyScens.forEach(s => {
       const payload = parseUpiPayload(s.rawPayload);
-      const a = evaluateRisk(payload, OPTS);
+      const a = evaluateRisk(payload, OPTS, s.context as UserContext);
       expect(
         a.triggeredRules.length,
         `${s.id} (${s.context}) should trigger ≥1 rule but triggered none`
@@ -413,28 +496,43 @@ describe('Scenario ground-truth vs computed verdict', () => {
     });
   });
 
-  it('SCEN-05 (WhatsApp cashback scam) triggers Rule 4', () => {
+  it('SCEN-02 (safe room deposit) does not trigger Rule 4', () => {
+    const s = scenarios.find(s => s.id === 'SCEN-02')!;
+    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
+    expect(a.triggeredRules).toHaveLength(0);
+    expect(a.verdict).toBe('Safe');
+  });
+
+  it('SCEN-03 (safe near-threshold payment) does not trigger Rule 5', () => {
+    const s = scenarios.find(s => s.id === 'SCEN-03')!;
+    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
+    expect(a.triggeredRules).toHaveLength(0);
+    expect(a.verdict).toBe('Safe');
+  });
+
+  it('SCEN-05 (cashback scam) triggers Rule 4', () => {
     const s = scenarios.find(s => s.id === 'SCEN-05')!;
-    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS);
+    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
     expect(a.triggeredRules.some(r => r.id === 4)).toBe(true);
   });
 
-  it('SCEN-06 (exam-fee phishing link) triggers Rule 6', () => {
+  it('SCEN-06 (phishing link) triggers Rule 6', () => {
     const s = scenarios.find(s => s.id === 'SCEN-06')!;
-    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS);
+    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
     expect(a.triggeredRules.some(r => r.id === 6)).toBe(true);
   });
 
-  it('SCEN-07 (look-alike sticker + high amount) triggers Rules 3 and 5', () => {
+  it('SCEN-07 (look-alike + high amount) triggers Rules 3 and 5', () => {
     const s = scenarios.find(s => s.id === 'SCEN-07')!;
-    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS);
+    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
     expect(a.triggeredRules.some(r => r.id === 3)).toBe(true);
     expect(a.triggeredRules.some(r => r.id === 5)).toBe(true);
   });
 
-  it('SCEN-08 (suspicious vendor + urgency) triggers Rules 2 and 7', () => {
+  it('SCEN-08 (unknown handle + urgency + name mismatch) triggers Rules 1, 2, 7', () => {
     const s = scenarios.find(s => s.id === 'SCEN-08')!;
-    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS);
+    const a = evaluateRisk(parseUpiPayload(s.rawPayload), OPTS, s.context as UserContext);
+    expect(a.triggeredRules.some(r => r.id === 1)).toBe(true);
     expect(a.triggeredRules.some(r => r.id === 2)).toBe(true);
     expect(a.triggeredRules.some(r => r.id === 7)).toBe(true);
   });

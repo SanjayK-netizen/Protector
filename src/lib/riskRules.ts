@@ -1,33 +1,44 @@
 /**
  * QRShield Explainable Risk Rules Engine
  *
+ * DOCUMENTED LIMITATIONS:
+ * 1. The engine cannot detect an exact copy of a trusted payee's UPI ID
+ *    (e.g., a tampered QR code that points to a legitimate payee or an attacker who
+ *    successfully registered a previously trusted VPA).
+ * 2. The engine cannot detect a scammer whose payee name matches their own UPI ID
+ *    (e.g., an attacker who registers their own name matching their VPA and requests payment).
+ *
  * Seven deterministic, explainable rules for UPI/QR payload analysis.
  * Each rule returns a plain-English reason a non-technical person can understand.
  *
- * Rules
- * -----
+ * Rules:
  * 1. Payee name does not match the UPI ID.
  * 2. UPI handle is not in the known-handles list.
  * 3. Look-alike of a trusted payee (small edit distance).
- * 4. "Receive / refund / cashback" wording in the note while QR asks the user to pay.
+ * 4. "Receive / refund / cashback" wording in the note while the QR asks the user to pay.
  * 5. Unusual amount above configured threshold.
- * 6. QR contains a web link instead of a UPI payload, or a shortened URL.
+ * 6. QR contains a web link instead of a UPI payload, a shortened URL, or unsupported payload.
  * 7. Urgency wording in the note.
  *
- * Verdict
- * -------
+ * Verdict:
  * 0 rules            => Safe
- * 1 rule (not 4/6)   => Check first
- * 2+ rules, or 4/6   => Risky
+ * 1 rule (not 4 or 6)=> Check first
+ * 2+ rules, or 4 / 6 => Risky
  *
- * Always return the full list of triggered rules — never only a score.
+ * Always returns the list of triggered reasons, never only a score.
  */
 
 import { ParsedUpiPayload } from './upiParser';
-import { AMOUNT_THRESHOLD, LOOKALIKE_MAX_DISTANCE } from '../config';
+import {
+  AMOUNT_THRESHOLD_MAP,
+  LOOKALIKE_MAX_DISTANCE,
+  UserContext,
+  DEFAULT_USER_CONTEXT,
+} from '../config';
 import defaultKnownHandles from '../data/knownHandles.json';
 
 export type Verdict = 'Safe' | 'Check first' | 'Risky';
+export type { UserContext };
 
 export interface TriggeredRule {
   id: number;
@@ -45,6 +56,7 @@ export interface RiskAssessment {
   reasons: string[];
   recommendedCheck: string;
   riskScore: number;
+  userContext: UserContext;
 }
 
 export interface TrustedPayee {
@@ -58,29 +70,33 @@ export interface RuleEvaluatorOptions {
   trustedPayees?: TrustedPayee[];
   amountThreshold?: number;
   lookalikeMaxDistance?: number;
+  context?: UserContext;
 }
 
 // ---------------------------------------------------------------------------
 // Keyword lists
 // ---------------------------------------------------------------------------
 
+/**
+ * Strong "you receive money" keywords for Rule 4.
+ * Note: Checked against transaction note only (not payee name).
+ * Neutral words like 'deposit', 'credit', 'claim', 'bonus', 'won' are excluded.
+ */
 const DECEPTIVE_KEYWORDS: string[] = [
   'receive',
   'refund',
   'cashback',
   'cash-back',
-  'credited',
-  'credit',
-  'claim',
   'reward',
   'rewards',
-  'won',
-  'winner',
-  'bonus',
   'prize',
-  'deposit',
+  'winner',
 ];
 
+/**
+ * High-pressure urgency phrases for Rule 7.
+ * Checked as whole words or phrases with word boundaries.
+ */
 const URGENCY_KEYWORDS: string[] = [
   'urgent',
   'urgently',
@@ -95,7 +111,7 @@ const URGENCY_KEYWORDS: string[] = [
   'due now',
   'last chance',
   'penalty',
-  'fine',
+  'late fine',
   'suspended',
   'blocked',
   'freeze',
@@ -137,7 +153,6 @@ export function isNameMatching(name: string, username: string): boolean {
   if (!name || !username) return false;
 
   const cleanName = name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
-  // Strip separators from username so "canteen" matches "canteen@testbank" already split
   const cleanUsername = username.toLowerCase().replace(/[^a-z0-9]/g, '');
 
   const nameTokens = cleanName.split(/\s+/).filter(t => t.length >= 3);
@@ -173,29 +188,42 @@ export function isNameMatching(name: string, username: string): boolean {
 
 /**
  * Evaluates all 7 explainable risk rules against a parsed QR/UPI payload.
- * Never throws; always returns an assessment.
+ * Accepts an optional user context ('student' | 'employee' | 'shop_customer' | 'merchant' | 'general').
+ * Never throws; always returns a typed assessment.
  */
 export function evaluateRisk(
   payload: ParsedUpiPayload,
-  options: RuleEvaluatorOptions = {}
+  options: RuleEvaluatorOptions = {},
+  context: UserContext = options.context ?? DEFAULT_USER_CONTEXT
 ): RiskAssessment {
-  const knownHandles = (options.knownHandles ?? defaultKnownHandles.knownHandles).map(h =>
+  const combinedDefaultHandles = [
+    ...defaultKnownHandles.knownHandles,
+    ...((defaultKnownHandles as { publicBankHandles?: string[] }).publicBankHandles ?? []),
+  ];
+
+  const knownHandles = (options.knownHandles ?? combinedDefaultHandles).map(h =>
     h.toLowerCase().replace(/^@/, '')
   );
   const trustedPayees = options.trustedPayees ?? defaultKnownHandles.trustedPayees;
-  const amountThreshold = options.amountThreshold ?? AMOUNT_THRESHOLD;
+  const amountThreshold =
+    options.amountThreshold ?? (AMOUNT_THRESHOLD_MAP[context] || AMOUNT_THRESHOLD_MAP.general);
   const lookalikeMaxDistance = options.lookalikeMaxDistance ?? LOOKALIKE_MAX_DISTANCE;
 
   const triggeredRules: TriggeredRule[] = [];
 
   // ------------------------------------------------------------------
-  // RULE 6: Web link or shortened URL instead of a UPI payload
-  // Checked first because non-UPI payloads skip all UPI-specific rules.
+  // RULE 6: Web link, shortened URL, or invalid/unsupported non-UPI payload
+  // Checked first because non-UPI payloads skip UPI-specific rules.
   // ------------------------------------------------------------------
   if (!payload.isUpi || payload.isUrl || payload.isShortenedUrl) {
-    const reason = payload.isShortenedUrl
-      ? `The QR contains a shortened URL ('${payload.raw}') that hides the real destination — do not follow it.`
-      : `The QR contains a web link ('${payload.raw}') instead of a direct UPI payment address.`;
+    let reason: string;
+    if (payload.error && !payload.isUrl && !payload.isShortenedUrl) {
+      reason = payload.error;
+    } else if (payload.isShortenedUrl) {
+      reason = `The QR contains a shortened URL ('${payload.raw}') that hides the real destination — do not follow it.`;
+    } else {
+      reason = `The QR contains a web link ('${payload.raw}') instead of a direct UPI payment address.`;
+    }
 
     triggeredRules.push({
       id: 6,
@@ -219,6 +247,17 @@ export function evaluateRisk(
   // UPI-specific rules (1, 2, 3, 4, 5, 7) — only when isUpi is true
   // ------------------------------------------------------------------
   if (payload.isUpi) {
+    // Parser error on UPI payload (e.g. invalid or negative amount)
+    if (payload.error) {
+      triggeredRules.push({
+        id: 5,
+        code: 'INVALID_AMOUNT',
+        title: 'Invalid Payment Amount',
+        reason: payload.error,
+        severity: 'high',
+      });
+    }
+
     // RULE 1: Payee name does not match the UPI ID
     if (payload.pn && payload.username) {
       if (!isNameMatching(payload.pn, payload.username)) {
@@ -226,7 +265,7 @@ export function evaluateRisk(
           id: 1,
           code: 'NAME_MISMATCH',
           title: 'Payee Name Does Not Match UPI ID',
-          reason: `The name shown ('${payload.pn}') does not match the UPI ID username ('${payload.username}'). These should correspond to the same person or business.`,
+          reason: `The name shown ('${payload.pn}') does not match the UPI ID username ('${payload.username}'). These should correspond to the same person or organization.`,
           severity: 'medium',
         });
       }
@@ -281,34 +320,37 @@ export function evaluateRisk(
             id: 3,
             code: 'LOOKALIKE_PAYEE',
             title: 'Address Looks Like a Trusted Payee',
-            reason: `'${payload.pa}' is very similar to the verified address '${trusted.vpa}' (${trusted.name}). This could be an impersonation attempt.`,
+            reason: `'${payload.pa}' is very similar to the verified address '${trusted.vpa}' (${trusted.name}) of a trusted payee. This could be an impersonation attempt.`,
             severity: 'medium',
           });
-          break; // one look-alike warning is enough
+          break; // one look-alike warning is sufficient
         }
       }
     }
 
-    // RULE 4: "Receive / refund / cashback" wording in the note
-    const noteText = `${payload.tn ?? ''} ${payload.pn ?? ''}`.toLowerCase();
-    const matchedDeceptive: string[] = [];
-    for (const kw of DECEPTIVE_KEYWORDS) {
-      if (new RegExp(`\\b${kw}\\b`, 'i').test(noteText)) {
-        matchedDeceptive.push(kw);
+    // RULE 4: "Receive / refund / cashback" wording in the note only
+    // Checked strictly against payload.tn (not payload.pn)
+    if (payload.tn) {
+      const matchedDeceptive: string[] = [];
+      for (const kw of DECEPTIVE_KEYWORDS) {
+        const regex = new RegExp(`\\b${kw}\\b`, 'i');
+        if (regex.test(payload.tn)) {
+          matchedDeceptive.push(kw);
+        }
+      }
+      if (matchedDeceptive.length > 0) {
+        triggeredRules.push({
+          id: 4,
+          code: 'DECEPTIVE_DIRECTION',
+          title: 'Misleading "Receive" or "Cashback" Language',
+          reason: `The note says '${matchedDeceptive.join(', ')}', which sounds like money coming to you — but scanning this QR code will send money from your account.`,
+          severity: 'high',
+        });
       }
     }
-    if (matchedDeceptive.length > 0) {
-      triggeredRules.push({
-        id: 4,
-        code: 'DECEPTIVE_DIRECTION',
-        title: 'Misleading "Receive" or "Cashback" Language',
-        reason: `The note says '${matchedDeceptive.join(', ')}', which sounds like money coming to you — but scanning this QR code will send money from your account.`,
-        severity: 'high',
-      });
-    }
 
-    // RULE 5: Unusual amount above threshold
-    if (payload.am !== undefined && payload.am > amountThreshold) {
+    // RULE 5: Unusual amount above threshold (only if amount is valid number)
+    if (payload.am !== undefined && !payload.error && payload.am > amountThreshold) {
       triggeredRules.push({
         id: 5,
         code: 'UNUSUAL_AMOUNT',
@@ -318,11 +360,13 @@ export function evaluateRisk(
       });
     }
 
-    // RULE 7: Urgency wording in the note
+    // RULE 7: Urgency wording in the note (whole words or phrases only)
     if (payload.tn) {
-      const noteLower = payload.tn.toLowerCase();
       for (const ukw of URGENCY_KEYWORDS) {
-        if (noteLower.includes(ukw)) {
+        // Match whole word or exact phrase boundary
+        const escaped = ukw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+        if (regex.test(payload.tn)) {
           triggeredRules.push({
             id: 7,
             code: 'URGENCY_PRESSURE',
@@ -339,7 +383,7 @@ export function evaluateRisk(
   // ------------------------------------------------------------------
   // Verdict
   // ------------------------------------------------------------------
-  const hasHighRiskRule = triggeredRules.some(r => r.id === 4 || r.id === 6);
+  const hasHighRiskRule = triggeredRules.some(r => r.id === 4 || r.id === 6 || r.severity === 'high');
   let verdict: Verdict;
 
   if (triggeredRules.length === 0) {
@@ -352,7 +396,7 @@ export function evaluateRisk(
 
   const recommendedCheck =
     verdict === 'Safe'
-      ? 'No warning signs detected. Confirm the amount on screen before paying.'
+      ? 'Details match a trusted payee. Confirm the amount on screen before paying.'
       : verdict === 'Check first'
         ? 'Something looks off. Ask the payee directly before sending money.'
         : 'Do not pay. One or more serious fraud indicators were found. Report or reject this request.';
@@ -363,5 +407,6 @@ export function evaluateRisk(
     reasons: triggeredRules.map(r => r.reason),
     recommendedCheck,
     riskScore: triggeredRules.length,
+    userContext: context,
   };
 }

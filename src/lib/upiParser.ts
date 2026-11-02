@@ -69,7 +69,7 @@ export function isShortenedUrl(url: string): boolean {
 }
 
 /**
- * Parses raw text extracted from a QR code.
+ * Parses raw text extracted from a QR code. Never throws on malformed input.
  */
 export function parseUpiPayload(raw: string): ParsedUpiPayload {
   if (!raw || typeof raw !== 'string' || !raw.trim()) {
@@ -84,7 +84,28 @@ export function parseUpiPayload(raw: string): ParsedUpiPayload {
 
   const trimmed = raw.trim();
 
-  // 1. Check if it's a UPI payment URI
+  // 1. Explicitly check for upi://collect or other non-pay UPI schemes
+  if (/^upi:\/\/collect/i.test(trimmed)) {
+    return {
+      raw,
+      isUpi: false,
+      isUrl: false,
+      isShortenedUrl: false,
+      error: "UPI collect requests ('upi://collect') are not supported. QR codes should only initiate pay requests.",
+    };
+  }
+
+  if (/^upi:\/\//i.test(trimmed) && !/^upi:\/\/pay/i.test(trimmed)) {
+    return {
+      raw,
+      isUpi: false,
+      isUrl: false,
+      isShortenedUrl: false,
+      error: "Unsupported UPI scheme. Only 'upi://pay' payment payloads are supported.",
+    };
+  }
+
+  // 2. Check if it's a UPI payment URI
   if (/^upi:\/\/pay/i.test(trimmed)) {
     try {
       const qIndex = trimmed.indexOf('?');
@@ -112,9 +133,14 @@ export function parseUpiPayload(raw: string): ParsedUpiPayload {
       const url = params.get('url') ?? undefined;
 
       let am: number | undefined = undefined;
+      let amError: string | undefined = undefined;
+
       if (amRaw !== undefined) {
-        const parsedAm = parseFloat(amRaw);
-        if (!isNaN(parsedAm) && parsedAm >= 0) {
+        const trimmedAm = amRaw.trim();
+        const parsedAm = Number(trimmedAm);
+        if (trimmedAm === '' || isNaN(parsedAm) || parsedAm < 0 || !isFinite(parsedAm)) {
+          amError = `Invalid or negative transaction amount ('${amRaw}'). Amount must be a positive number.`;
+        } else {
           am = parsedAm;
         }
       }
@@ -148,6 +174,7 @@ export function parseUpiPayload(raw: string): ParsedUpiPayload {
         url,
         username,
         handle,
+        error: amError,
       };
     } catch (err) {
       return {
@@ -160,7 +187,7 @@ export function parseUpiPayload(raw: string): ParsedUpiPayload {
     }
   }
 
-  // 2. Check if it's an external web URL or shortened URL
+  // 3. Check if it's an external web URL or shortened URL
   const isUrl = isWebUrl(trimmed);
   const shortened = isUrl ? isShortenedUrl(trimmed) : false;
 
@@ -171,4 +198,3 @@ export function parseUpiPayload(raw: string): ParsedUpiPayload {
     isShortenedUrl: shortened,
   };
 }
-

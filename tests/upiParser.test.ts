@@ -42,14 +42,7 @@ describe('UPI and QR Payload Parser (upiParser)', () => {
       expect(parsed.pa).toBe('bookstore@testbank');
       expect(parsed.am).toBeUndefined();
       expect(parsed.tn).toBeUndefined();
-    });
-
-    it('handles invalid amount strings without crashing', () => {
-      const raw = 'upi://pay?pa=canteen@testbank&am=invalid_num';
-      const parsed = parseUpiPayload(raw);
-
-      expect(parsed.isUpi).toBe(true);
-      expect(parsed.am).toBeUndefined();
+      expect(parsed.error).toBeUndefined();
     });
 
     it('handles payee address without an @ symbol gracefully', () => {
@@ -59,6 +52,47 @@ describe('UPI and QR Payload Parser (upiParser)', () => {
       expect(parsed.isUpi).toBe(true);
       expect(parsed.username).toBe('singleword');
       expect(parsed.handle).toBeUndefined();
+    });
+  });
+
+  describe('parseUpiPayload - Scheme & Amount Error Handling', () => {
+    it('flags upi://collect as an explicit parser error, not a web link', () => {
+      const raw = 'upi://collect?pa=scammer@testbank&pn=CollectReq&am=100.00';
+      const parsed = parseUpiPayload(raw);
+
+      expect(parsed.isUpi).toBe(false);
+      expect(parsed.isUrl).toBe(false);
+      expect(parsed.isShortenedUrl).toBe(false);
+      expect(parsed.error).toBeDefined();
+      expect(parsed.error).toContain('collect');
+    });
+
+    it('flags negative amount as an explicit parser error', () => {
+      const raw = 'upi://pay?pa=canteen@testbank&am=-50.00';
+      const parsed = parseUpiPayload(raw);
+
+      expect(parsed.isUpi).toBe(true);
+      expect(parsed.am).toBeUndefined();
+      expect(parsed.error).toBeDefined();
+      expect(parsed.error).toContain('negative');
+    });
+
+    it('flags non-numeric invalid amount string as an explicit parser error', () => {
+      const raw = 'upi://pay?pa=canteen@testbank&am=invalid_num';
+      const parsed = parseUpiPayload(raw);
+
+      expect(parsed.isUpi).toBe(true);
+      expect(parsed.am).toBeUndefined();
+      expect(parsed.error).toBeDefined();
+      expect(parsed.error).toContain('Invalid or negative');
+    });
+
+    it('flags unsupported UPI schemes as explicit errors', () => {
+      const raw = 'upi://mandate?pa=canteen@testbank';
+      const parsed = parseUpiPayload(raw);
+
+      expect(parsed.isUpi).toBe(false);
+      expect(parsed.error).toBeDefined();
     });
   });
 
@@ -112,6 +146,7 @@ describe('UPI and QR Payload Parser (upiParser)', () => {
       expect(isWebUrl('https://example.test')).toBe(true);
       expect(isWebUrl('www.example.test')).toBe(true);
       expect(isWebUrl('upi://pay?pa=abc@testbank')).toBe(false);
+      expect(isWebUrl('upi://collect?pa=abc@testbank')).toBe(false);
       expect(isWebUrl('just some text')).toBe(false);
 
       expect(isShortenedUrl('https://t.co/abc')).toBe(true);
@@ -120,4 +155,3 @@ describe('UPI and QR Payload Parser (upiParser)', () => {
     });
   });
 });
-

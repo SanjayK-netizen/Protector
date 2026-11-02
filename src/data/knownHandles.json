@@ -1,30 +1,61 @@
 {
+  "_comment": "Synthetic test handles and widely used public bank handles. This list needs review before any real-world use.",
   "knownHandles": [
     "testbank",
-    "studentbank",
-    "campusbank",
-    "oktestbank"
+    "testupi",
+    "oktestbank",
+    "studentbank"
+  ],
+  "publicBankHandles": [
+    "oksbi",
+    "okhdfcbank",
+    "okicici",
+    "okaxis",
+    "ybl",
+    "paytm",
+    "ibl",
+    "axl"
   ],
   "trustedPayees": [
     {
       "name": "Campus Canteen",
       "vpa": "canteen@testbank",
-      "category": "Food Services"
+      "category": "Campus"
     },
     {
       "name": "College Library",
       "vpa": "library@testbank",
-      "category": "Academic Services"
-    },
-    {
-      "name": "Campus Bookstore",
-      "vpa": "bookstore@testbank",
-      "category": "Supplies"
+      "category": "Campus"
     },
     {
       "name": "Hostel Office",
       "vpa": "hostel.office@testbank",
-      "category": "Administration"
+      "category": "Campus"
+    },
+    {
+      "name": "Grocery Store",
+      "vpa": "grocery@testbank",
+      "category": "Retail"
+    },
+    {
+      "name": "Electricity Board",
+      "vpa": "electricity@testupi",
+      "category": "Utilities"
+    },
+    {
+      "name": "Mobile Recharge",
+      "vpa": "mobile.recharge@testbank",
+      "category": "Utilities"
+    },
+    {
+      "name": "Office Canteen",
+      "vpa": "office.canteen@testbank",
+      "category": "Workplace"
+    },
+    {
+      "name": "Vendor Accounts",
+      "vpa": "vendor.accounts@testbank",
+      "category": "Workplace"
     }
   ]
 }
