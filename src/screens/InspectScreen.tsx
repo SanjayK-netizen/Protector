@@ -8,6 +8,7 @@ import { PaymentCard } from '../components/PaymentCard';
 import { VerdictPanel } from '../components/VerdictPanel';
 import { verdictLabel } from '../components/VerdictBadge';
 import { historyStore, HistoryRecord } from '../lib/history';
+import { CameraScanner } from '../components/CameraScanner';
 
 interface InspectScreenProps {
   initialScenarioId?: string;
@@ -69,6 +70,8 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
   const [tab, setTab] = useState<InspectTab>('qrshield');
   const [savedMessage, setSavedMessage] = useState('');
   const [pasteError, setPasteError] = useState('');
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [cameraScannedSuccess, setCameraScannedSuccess] = useState(false);
 
   const selectedScenario = scenarioById(scenarioId);
 
@@ -88,6 +91,7 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
       setContext(scenario.context);
       setSavedMessage('');
       setPasteError('');
+      setCameraScannedSuccess(false);
     }
   }
 
@@ -97,6 +101,7 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
     setContext(preset.context);
     setSavedMessage('');
     setPasteError('');
+    setCameraScannedSuccess(false);
   }
 
   async function handlePasteFromClipboard() {
@@ -107,6 +112,7 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
         setPayloadText(text.trim());
         setScenarioId('');
         setSavedMessage('');
+        setCameraScannedSuccess(false);
       } else {
         setPasteError('Clipboard is empty.');
       }
@@ -120,6 +126,15 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
     setScenarioId('');
     setSavedMessage('');
     setPasteError('');
+    setCameraScannedSuccess(false);
+  }
+
+  function handleCameraScan(scannedData: string) {
+    setPayloadText(scannedData);
+    setScenarioId('');
+    setSavedMessage('');
+    setPasteError('');
+    setCameraScannedSuccess(true);
   }
 
   function saveToHistory() {
@@ -153,10 +168,10 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
     <section className="workspace-screen">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Payload analysis</p>
+          <p className="eyebrow">Payload analysis & live camera</p>
           <h1>Inspect a QR payload</h1>
           <p>
-            Paste or pick synthetic QR payloads to observe real-time rule triggers, risk badges, and recommendations.
+            Scan a physical QR code with your camera or select synthetic payloads for real-time risk evaluation.
           </p>
         </div>
         {liveInspection && (
@@ -167,9 +182,44 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
         )}
       </header>
 
+      {/* Camera Scanner Modal Component */}
+      <CameraScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleCameraScan}
+      />
+
       <div className="inspect-layout">
         {/* Left Input Panel */}
         <section className="panel inspect-controls">
+          {/* Prominent Camera Scan Action Card */}
+          <div className="camera-action-card">
+            <div className="camera-action-info">
+              <h3>Scan Live QR Code</h3>
+              <p>Point camera at any UPI QR to inspect & verify</p>
+            </div>
+            <button
+              type="button"
+              className="primary-button camera-scan-btn"
+              onClick={() => setIsScannerOpen(true)}
+            >
+              📷 Open Camera
+            </button>
+          </div>
+
+          {cameraScannedSuccess && (
+            <div className="camera-scanned-banner">
+              <span>✓ QR Code scanned from camera successfully!</span>
+              <button
+                type="button"
+                style={{ background: 'transparent', border: 'none', color: '#a7f3d0', cursor: 'pointer' }}
+                onClick={() => setCameraScannedSuccess(false)}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <h2>Input & Presets</h2>
 
           {/* Quick-Pick Synthetic Payloads */}
@@ -259,11 +309,12 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
             className="text-input payload-input"
             value={payloadText}
             maxLength={2000}
-            placeholder="Paste or type upi://pay?... or web link here for real-time analysis"
+            placeholder="Scan with camera, paste, or type upi://pay?... or web link here"
             onChange={event => {
               setPayloadText(event.target.value);
               if (event.target.value !== selectedScenario?.rawPayload) setScenarioId('');
               setSavedMessage('');
+              setCameraScannedSuccess(false);
             }}
           />
 
@@ -325,7 +376,7 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
 
           {!liveInspection ? (
             <p className="empty-state">
-              Paste a UPI QR payload or pick any synthetic scenario above to view real-time rule triggers, risk badges, and recommendations.
+              Scan a QR code with the camera, paste a payload, or pick any synthetic scenario above to view real-time risk badges and recommendations.
             </p>
           ) : tab === 'baseline' ? (
             <BaselineView payload={liveInspection.payload} />
