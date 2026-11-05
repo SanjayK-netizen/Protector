@@ -1,5 +1,6 @@
 import { FormEvent } from 'react';
 import type { ParticipantMode } from '../App';
+import { isValidParticipantCode } from '../lib/session';
 
 interface StartScreenProps {
   participantCode: string;
@@ -22,7 +23,7 @@ export function StartScreen({
 }: StartScreenProps) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (consent) onStart();
+    if (consent && isValidParticipantCode(participantCode)) onStart();
   }
 
   return (
@@ -43,10 +44,14 @@ export function StartScreen({
           type="text"
           autoComplete="off"
           value={participantCode}
-          onChange={event => onParticipantCodeChange(event.target.value)}
+          maxLength={12}
+          onChange={event => onParticipantCodeChange(event.target.value.trim())}
           placeholder="Enter your assigned code"
         />
-        <p className="field-hint">Do not enter your name or other identifying details.</p>
+        <p className="field-hint">Use 2–12 letters, numbers, or hyphens. Do not enter a name.</p>
+        {participantCode && !isValidParticipantCode(participantCode) && (
+          <p className="form-error" role="alert">Use only 2–12 letters, numbers, or hyphens.</p>
+        )}
 
         <fieldset className="mode-order">
           <legend>Mode order</legend>
@@ -76,12 +81,14 @@ export function StartScreen({
             checked={consent}
             onChange={event => onConsentChange(event.target.checked)}
           />
-          <span>
-            I understand this is a simulation and consent to continue.
-          </span>
+          <span>I understand this is a simulation and consent to continue.</span>
         </label>
 
-        <button className="primary-button" type="submit" disabled={!consent}>
+        <button
+          className="primary-button"
+          type="submit"
+          disabled={!consent || !isValidParticipantCode(participantCode)}
+        >
           Start simulation
         </button>
       </form>

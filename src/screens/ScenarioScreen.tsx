@@ -1,6 +1,7 @@
 import type { UserContext } from '../config';
 import type { ParticipantMode } from '../App';
 import { PaymentCard } from '../components/PaymentCard';
+import { BaselineView } from '../components/BaselineView';
 import { VerdictPanel } from '../components/VerdictPanel';
 import type { RiskAssessment } from '../lib/riskRules';
 import type { ParsedUpiPayload } from '../lib/upiParser';
@@ -22,6 +23,9 @@ interface ScenarioScreenProps {
   onDontPay: () => void;
   onVerifyFirst: () => void;
   onContinue: () => void;
+  explanationText?: string;
+  onExplanationChange?: (text: string) => void;
+  onEndSession?: () => void;
 }
 
 export function ScenarioScreen({
@@ -33,6 +37,9 @@ export function ScenarioScreen({
   onDontPay,
   onVerifyFirst,
   onContinue,
+  explanationText = '',
+  onExplanationChange,
+  onEndSession,
 }: ScenarioScreenProps) {
   const isQrShield = mode === 'qrshield';
 
@@ -50,7 +57,9 @@ export function ScenarioScreen({
         <p>{scenario.description}</p>
       </header>
 
-      <PaymentCard payload={scenario.payload} />
+      {isQrShield
+        ? <PaymentCard payload={scenario.payload} />
+        : <BaselineView payload={scenario.payload} />}
 
       {isQrShield && assessment && <VerdictPanel assessment={assessment} />}
 
@@ -62,6 +71,8 @@ export function ScenarioScreen({
             className="text-input explanation-input"
             rows={3}
             placeholder="Write what you would check before deciding"
+            value={explanationText}
+            onChange={event => onExplanationChange?.(event.target.value)}
           />
         </label>
       )}
@@ -83,6 +94,11 @@ export function ScenarioScreen({
             Verify first
           </button>
         </div>
+      )}
+      {onEndSession && !paymentShown && (
+        <button className="text-button end-session-button" type="button" onClick={onEndSession}>
+          End session early
+        </button>
       )}
     </section>
   );
