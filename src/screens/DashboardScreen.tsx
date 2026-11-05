@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import type { HistoryRecord } from '../lib/history';
 import { summarizeScenarios } from '../lib/scenarios';
 import { formatHash } from '../lib/routing';
+import { VerdictBadge } from '../components/VerdictBadge';
+import { verdictLabel } from '../components/VerdictBadge';
 
 interface DashboardScreenProps {
   history: HistoryRecord[];
@@ -42,9 +44,9 @@ export function DashboardScreen({ history }: DashboardScreenProps) {
       </header>
 
       <div className="stat-grid" aria-label="Scenario summary">
-        <article className="stat-card"><span>Scenarios</span><strong>10</strong><small>5 safe · 5 risky ground truth</small></article>
+        <article className="stat-card"><span>Scenarios</span><strong>{summary.scenarioCount}</strong><small>{summary.safeGroundTruthCount} safe · {summary.riskyGroundTruthCount} risky ground truth</small></article>
         <article className="stat-card"><span>Risky flagged</span><strong>{summary.riskyFlagged} / {summary.riskyGroundTruthCount}</strong><small>{summary.inScopeRiskyFlagged} of {summary.inScopeRiskyCount} in-scope risky scenarios</small></article>
-        <article className="stat-card"><span>Safe scenarios</span><strong>{summary.safeRiskyCount} Risky · {summary.safeCheckFirstCount} Check first</strong><small>Engine outcomes on safe ground truth</small></article>
+        <article className="stat-card"><span>Safe scenarios</span><strong>{summary.safeRiskyCount} RISKY · {summary.safeCheckFirstCount} CHECK FIRST</strong><small>Engine outcomes on safe ground truth</small></article>
         <article className="stat-card"><span>Local trials logged</span><strong>{history.filter(row => row.record_type === 'session').length}</strong><small>Local data, not validated results</small></article>
       </div>
 
@@ -98,8 +100,8 @@ export function DashboardScreen({ history }: DashboardScreenProps) {
                 <tr key={result.scenario.id}>
                   <td><strong>{result.scenario.id}</strong><span className="cell-secondary">{result.scenario.title}</span></td>
                   <td>{result.scenario.groundTruth}</td>
-                  <td><span className={`verdict-chip ${result.assessment.verdict.toLowerCase().replace(' ', '-')}`}>{result.assessment.verdict}</span></td>
-                  <td>{result.expectedVerdict}</td>
+                  <td><VerdictBadge verdict={result.assessment.verdict} /></td>
+                  <td>{verdictLabel(result.expectedVerdict)}</td>
                   <td>{outcomeLabel(result.outcome)}</td>
                   <td><a className="small-link" href={formatHash({ page: 'inspect', scenarioId: result.scenario.id })}>Inspect</a></td>
                 </tr>

@@ -1,4 +1,5 @@
 import type { RiskAssessment } from '../lib/riskRules';
+import { VerdictBadge } from './VerdictBadge';
 
 interface VerdictPanelProps {
   assessment: RiskAssessment;
@@ -18,7 +19,7 @@ export function VerdictPanel({ assessment }: VerdictPanelProps) {
       aria-live="polite"
     >
       <h2 id="verdict-heading">
-        QRShield check: <span>{assessment.verdict}</span>
+        QRShield check: <VerdictBadge verdict={assessment.verdict} />
       </h2>
       <div className="verdict-reasons">
         <h3>What we found</h3>

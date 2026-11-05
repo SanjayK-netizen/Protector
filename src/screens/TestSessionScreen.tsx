@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ParticipantMode } from '../lib/assessment';
 import { ScenarioScreen } from './ScenarioScreen';
 import type { ScenarioDetails } from './ScenarioScreen';
@@ -39,12 +39,20 @@ export function TestSessionScreen({ onSessionActiveChange }: TestSessionScreenPr
   const [completed, setCompleted] = useState(0);
   const [paymentShown, setPaymentShown] = useState(false);
   const [explanation, setExplanation] = useState('');
+  const decisionRecorded = useRef(false);
 
   const activeMode = plan?.modeOrder[modeIndex];
   const trial = activeMode && plan ? plan.trialsByMode[activeMode][trialIndex] : undefined;
   const assessment = trial?.mode === 'qrshield'
     ? assessmentForMode('qrshield', parseUpiPayload(trial.scenario.rawPayload), trial.scenario.context)
     : undefined;
+
+  useEffect(() => {
+    if (phase === 'trial') {
+      decisionRecorded.current = false;
+      setTrialStartedAt(Date.now());
+    }
+  }, [phase, modeIndex, trialIndex]);
 
   function startSession() {
     if (!consent) return;
@@ -55,7 +63,6 @@ export function TestSessionScreen({ onSessionActiveChange }: TestSessionScreenPr
     setCompleted(0);
     setPaymentShown(false);
     setExplanation('');
-    setTrialStartedAt(Date.now());
     setPhase('trial');
     onSessionActiveChange?.(true);
   }
@@ -66,7 +73,6 @@ export function TestSessionScreen({ onSessionActiveChange }: TestSessionScreenPr
     setExplanation('');
     if (trialIndex + 1 < plan.trialsByMode[activeMode].length) {
       setTrialIndex(index => index + 1);
-      setTrialStartedAt(Date.now());
       return;
     }
     if (modeIndex + 1 < plan.modeOrder.length) {
@@ -80,7 +86,6 @@ export function TestSessionScreen({ onSessionActiveChange }: TestSessionScreenPr
   function beginSecondMode() {
     setModeIndex(index => index + 1);
     setTrialIndex(0);
-    setTrialStartedAt(Date.now());
     setPhase('trial');
   }
 
@@ -91,7 +96,8 @@ export function TestSessionScreen({ onSessionActiveChange }: TestSessionScreenPr
   }
 
   function recordDecision(decision: Decision) {
-    if (!plan || !trial) return;
+    if (!plan || !trial || decisionRecorded.current) return;
+    decisionRecorded.current = true;
     const verdict = trial.mode === 'qrshield' ? assessment?.verdict : undefined;
     const record = makeDecisionRecord({
       participantCode: plan.participantCode,
@@ -104,6 +110,7 @@ export function TestSessionScreen({ onSessionActiveChange }: TestSessionScreenPr
       explanationText: explanation,
       engineVerdict: verdict,
       triggeredRules: assessment?.triggeredRules.map(rule => rule.id),
+      consentGiven: consent,
     });
     historyStore.append(record);
     setCompleted(count => count + 1);
@@ -151,6 +158,8 @@ export function TestSessionScreen({ onSessionActiveChange }: TestSessionScreenPr
           setPhase('start');
           setPaymentShown(false);
           setCompleted(0);
+          setConsent(false);
+          setParticipantCode('');
           onSessionActiveChange?.(false);
         }} />
       </div>
@@ -162,7 +171,7 @@ export function TestSessionScreen({ onSessionActiveChange }: TestSessionScreenPr
   return (
     <div className="workspace-screen session-screen">
       <div className="session-progress">
-        <span>Trial {completed + 1} of 20</span>
+        <span>Trial {completed + (paymentShown ? 0 : 1)} of 20</span>
         <span>{activeMode === 'baseline' ? 'Baseline mode' : 'QRShield mode'}</span>
         <button type="button" className="text-button" onClick={endEarly}>End session early</button>
       </div>

@@ -725,6 +725,26 @@ tbody tr:hover { background: rgba(56, 189, 248, 0.04); }
 .verdict-chip.check-first { background: #713f12; color: #fde68a; }
 .verdict-chip.risky { background: #7f1d1d; color: #fecaca; }
 
+.verdict-badge {
+  display: inline-flex;
+  min-height: 1.8rem;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.verdict-badge.safe { background: #064e3b; color: #a7f3d0; }
+.verdict-badge.check-first { background: #713f12; color: #fde68a; }
+.verdict-badge.risky { background: #7f1d1d; color: #fecaca; }
+.verdict-icon { font-size: 0.9rem; line-height: 1; }
+.verdict-panel h2 .verdict-badge { margin-left: 0.25rem; vertical-align: middle; }
+
 .small-link,
 .small-link-button {
   display: inline-block;

@@ -30,6 +30,7 @@ export interface SessionRecordInput {
   engineVerdict?: Verdict;
   triggeredRules?: number[];
   timestamp?: string;
+  consentGiven?: boolean;
 }
 
 export function isValidParticipantCode(code: string): boolean {
@@ -103,5 +104,6 @@ export function makeDecisionRecord(input: SessionRecordInput): HistoryRecord {
     context: input.scenario.context,
     engine_verdict: input.mode === 'qrshield' ? input.engineVerdict ?? '' : '',
     triggered_rules: input.mode === 'qrshield' ? input.triggeredRules ?? [] : [],
+    consent_given: input.consentGiven ?? null,
   };
 }

@@ -23,6 +23,7 @@ export interface HistoryRecord {
   context: UserContext | '';
   engine_verdict: Verdict | '';
   triggered_rules: number[];
+  consent_given: boolean | null;
 }
 
 export interface StorageLike {
@@ -38,6 +39,7 @@ const VALID_MODES = new Set(['baseline', 'qrshield']);
 const VALID_DECISIONS = new Set(['Pay', "Don't pay", 'Verify first']);
 const VALID_CONTEXTS = new Set(['student', 'employee', 'shop_customer', 'merchant', 'general']);
 const VALID_VERDICTS = new Set(['Safe', 'Check first', 'Risky']);
+const EMPTY_HISTORY: HistoryRecord[] = [];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -61,6 +63,7 @@ export function validateHistoryRecord(value: unknown): HistoryRecord | undefined
     context,
     engine_verdict,
     triggered_rules,
+    consent_given,
   } = value;
   if (
     typeof participant_code !== 'string' ||
@@ -70,7 +73,12 @@ export function validateHistoryRecord(value: unknown): HistoryRecord | undefined
     !(typeof decision === 'string' && (VALID_DECISIONS.has(decision) || decision === '')) ||
     !(typeof decision_correct === 'boolean' || decision_correct === '') ||
     !(typeof followed_recommended_check === 'boolean' || followed_recommended_check === null) ||
-    !(typeof time_to_decision_seconds === 'number' || time_to_decision_seconds === '') ||
+    !(
+      time_to_decision_seconds === '' ||
+      (typeof time_to_decision_seconds === 'number' &&
+        Number.isFinite(time_to_decision_seconds) &&
+        time_to_decision_seconds >= 0)
+    ) ||
     typeof explanation_text !== 'string' ||
     !(record_type === 'session' || record_type === 'inspect') ||
     typeof session_id !== 'string' ||
@@ -78,7 +86,8 @@ export function validateHistoryRecord(value: unknown): HistoryRecord | undefined
     !(typeof context === 'string' && (VALID_CONTEXTS.has(context) || context === '')) ||
     !(typeof engine_verdict === 'string' && (VALID_VERDICTS.has(engine_verdict) || engine_verdict === '')) ||
     !Array.isArray(triggered_rules) ||
-    !triggered_rules.every(rule => Number.isInteger(rule) && rule >= 1 && rule <= 7)
+    !triggered_rules.every(rule => Number.isInteger(rule) && rule >= 1 && rule <= 7) ||
+    !(typeof consent_given === 'boolean' || consent_given === null)
   ) {
     return undefined;
   }
@@ -98,6 +107,7 @@ export function validateHistoryRecord(value: unknown): HistoryRecord | undefined
     context: context as HistoryRecord['context'],
     engine_verdict: engine_verdict as HistoryRecord['engine_verdict'],
     triggered_rules: triggered_rules.map(Number),
+    consent_given,
   };
 }
 
@@ -158,7 +168,7 @@ export function createHistoryStore(
 
   return {
     getSnapshot: () => load(),
-    getServerSnapshot: (): HistoryRecord[] => [],
+    getServerSnapshot: (): HistoryRecord[] => EMPTY_HISTORY,
     subscribe(listener: Listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

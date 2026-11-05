@@ -60,10 +60,10 @@ export function HistoryScreen() {
         </div>
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Time</th><th>Participant</th><th>Record / mode</th><th>Scenario</th><th>Decision</th><th>Verdict</th><th>Seconds</th><th>Explanation</th></tr></thead>
+            <thead><tr><th>Time</th><th>Participant</th><th>Consent</th><th>Record / mode</th><th>Scenario</th><th>Decision</th><th>Verdict</th><th>Seconds</th><th>Explanation</th></tr></thead>
             <tbody>{filtered.map((record, index) => (
               <tr key={`${record.timestamp}-${record.scenario_id}-${index}`}>
-                <td>{record.timestamp}</td><td>{record.participant_code || '—'}</td>
+                <td>{record.timestamp}</td><td>{record.participant_code || '—'}</td><td>{record.consent_given === null ? '—' : record.consent_given ? 'Yes' : 'No'}</td>
                 <td>{record.record_type} · {record.mode}</td><td>{record.scenario_id}</td>
                 <td>{record.decision || '—'}</td><td>{record.engine_verdict || '—'}</td>
                 <td>{record.time_to_decision_seconds === '' ? '—' : record.time_to_decision_seconds}</td><td>{record.explanation_text || '—'}</td>

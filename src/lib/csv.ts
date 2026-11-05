@@ -16,6 +16,7 @@ export const CSV_COLUMNS = [
   'context',
   'engine_verdict',
   'triggered_rules',
+  'consent_given',
 ] as const;
 
 function neutralizeFormula(value: string): string {
@@ -45,6 +46,7 @@ export function historyToCsv(records: readonly HistoryRecord[]): string {
       context: record.context,
       engine_verdict: record.engine_verdict,
       triggered_rules: record.triggered_rules.join('|'),
+      consent_given: record.consent_given,
     };
     return CSV_COLUMNS.map(column => quoteCsv(values[column])).join(',');
   });

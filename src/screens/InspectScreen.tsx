@@ -8,6 +8,7 @@ import { SCENARIOS, scenarioById } from '../lib/scenarios';
 import { BaselineView } from '../components/BaselineView';
 import { PaymentCard } from '../components/PaymentCard';
 import { VerdictPanel } from '../components/VerdictPanel';
+import { verdictLabel } from '../components/VerdictBadge';
 import { ENGINE_OPTIONS } from '../lib/scenarios';
 import { historyStore, HistoryRecord } from '../lib/history';
 
@@ -78,6 +79,7 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
       context,
       engine_verdict: inspected.assessment.verdict,
       triggered_rules: inspected.assessment.triggeredRules.map(rule => rule.id),
+      consent_given: null,
     };
     if (historyStore.append(row)) setSavedMessage('Inspection saved to this browser’s local history.');
     else setSavedMessage('This inspection could not be saved.');
@@ -109,7 +111,12 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
             }}
           />
           <div className="input-meta"><span>{payloadText.length} / 2000 characters</span><label htmlFor="context-select">User type</label></div>
-          <select id="context-select" className="text-input" value={context} onChange={event => setContext(event.target.value as UserContext)}>
+          <select id="context-select" className="text-input" value={context} onChange={event => {
+            const nextContext = event.target.value as UserContext;
+            setContext(nextContext);
+            if (selectedScenario && nextContext !== selectedScenario.context) setScenarioId('');
+            setInspected(undefined);
+          }}>
             {contexts.map(item => <option key={item} value={item}>{item.replace('_', ' ')}</option>)}
           </select>
           <button type="button" className="primary-button" onClick={inspectPayload} disabled={!payloadText.trim()}>
@@ -149,7 +156,7 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
               {selectedScenario && (
                 <div className="answer-key">
                   <strong>Research answer key</strong>
-                  <span>Ground truth: {selectedScenario.groundTruth} · Expected: {selectedScenario.id === 'SCEN-09' ? 'Check first' : selectedScenario.knownLimitation ? 'Safe (known limitation)' : selectedScenario.groundTruth === 'safe' ? 'Safe' : 'Risky'}</span>
+                  <span>Ground truth: {selectedScenario.groundTruth} · Expected: {verdictLabel(selectedScenario.id === 'SCEN-09' ? 'Check first' : selectedScenario.knownLimitation ? 'Safe' : selectedScenario.groundTruth === 'safe' ? 'Safe' : 'Risky')} {selectedScenario.knownLimitation ? '(known limitation)' : ''}</span>
                 </div>
               )}
               {selectedScenario?.knownLimitation && (

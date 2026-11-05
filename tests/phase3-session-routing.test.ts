@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSessionPlan, followedRecommendation, isValidParticipantCode, scoreDecision } from '../src/lib/session';
 import { parseHash, formatHash } from '../src/lib/routing';
 import { SCENARIOS } from '../src/lib/scenarios';
+import { makeDecisionRecord } from '../src/lib/session';
 
 describe('Session plan and participant code', () => {
   it('creates twenty trials with every scenario once per mode and respects mode order', () => {
@@ -38,6 +39,21 @@ describe('Decision scoring and route parsing', () => {
     expect(followedRecommendation('Risky', 'Verify first', 'qrshield')).toBe(true);
     expect(followedRecommendation('Check first', 'Pay', 'qrshield')).toBe(false);
     expect(followedRecommendation(undefined, 'Pay', 'baseline')).toBeNull();
+  });
+
+  it('records consent for every submitted test-session decision', () => {
+    const record = makeDecisionRecord({
+      participantCode: 'P01',
+      sessionId: 'session-1',
+      mode: 'baseline',
+      scenario: SCENARIOS[0],
+      decision: 'Pay',
+      followedRecommendedCheck: null,
+      timeToDecisionSeconds: 1,
+      explanationText: '',
+      consentGiven: true,
+    });
+    expect(record.consent_given).toBe(true);
   });
 
   it('round-trips supported hash routes and defaults unknown routes to dashboard', () => {

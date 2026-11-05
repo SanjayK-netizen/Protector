@@ -8,6 +8,24 @@ describe('History CSV export', () => {
     const csv = historyToCsv([]);
     expect(csv.startsWith('\uFEFF')).toBe(true);
     expect(csv.slice(1).split('\r\n')[0].split(',')).toEqual([...CSV_COLUMNS]);
+    expect(CSV_COLUMNS).toEqual([
+      'participant_code',
+      'mode',
+      'scenario_id',
+      'ground_truth',
+      'decision',
+      'decision_correct',
+      'followed_recommended_check',
+      'time_to_decision_seconds',
+      'explanation_text',
+      'record_type',
+      'session_id',
+      'timestamp',
+      'context',
+      'engine_verdict',
+      'triggered_rules',
+      'consent_given',
+    ]);
     expect(csv).toContain('\r\n');
     expect(csv).not.toContain('\n\n');
   });

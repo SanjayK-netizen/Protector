@@ -5,6 +5,7 @@ import { VerdictPanel } from '../components/VerdictPanel';
 import { formatHash } from '../lib/routing';
 import { summarizeScenarios } from '../lib/scenarios';
 import { parseUpiPayload } from '../lib/upiParser';
+import { VerdictBadge } from '../components/VerdictBadge';
 
 interface CompareScreenProps {
   initialScenarioId?: string;
@@ -26,7 +27,7 @@ export function CompareScreen({ initialScenarioId }: CompareScreenProps) {
       </header>
       <div className="trial-cards">
         <article className="trial-card"><span>T1 · Risky payments flagged</span><strong>{summary.riskyFlagged} of {summary.riskyGroundTruthCount}</strong><small>In-scope: {summary.inScopeRiskyFlagged} of {summary.inScopeRiskyCount} · Baseline: 0 by design</small></article>
-        <article className="trial-card"><span>T2 · Safe payment outcomes</span><strong>{summary.safeRiskyCount} Risky · {summary.safeCheckFirstCount} Check first</strong><small>At most 1 Check first; measured on current scenarios.</small></article>
+        <article className="trial-card"><span>T2 · Safe payment outcomes</span><strong>{summary.safeRiskyCount} RISKY · {summary.safeCheckFirstCount} CHECK FIRST</strong><small>At most 1 Check first; measured on current scenarios.</small></article>
         <article className="trial-card"><span>T3 · Human response</span><strong>Not run</strong><small>No human testing has been conducted.</small></article>
       </div>
       <section className="panel table-panel">
@@ -38,7 +39,7 @@ export function CompareScreen({ initialScenarioId }: CompareScreenProps) {
               <tr key={result.scenario.id} className={result.scenario.id === selectedId ? 'selected-row' : ''}>
                 <td><strong>{result.scenario.id}</strong><span className="cell-secondary">{result.scenario.title}</span></td>
                 <td>Payee details only; no verdict</td>
-                <td><span className={`verdict-chip ${result.assessment.verdict.toLowerCase().replace(' ', '-')}`}>{result.assessment.verdict}</span><span className="cell-secondary">{result.assessment.triggeredRules.length} rule(s)</span></td>
+                <td><VerdictBadge verdict={result.assessment.verdict} /><span className="cell-secondary">{result.assessment.triggeredRules.length} rule(s)</span></td>
                 <td><button className="small-link-button" type="button" onClick={() => {
                   setSelectedId(result.scenario.id);
                   window.location.hash = formatHash({ page: 'compare', scenarioId: result.scenario.id });
