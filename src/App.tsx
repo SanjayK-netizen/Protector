@@ -20,6 +20,7 @@ export default function App() {
   const [sessionActive, setSessionActive] = useState(false);
   const hash = useSyncExternalStore(subscribeToHash, getHashSnapshot, getServerHashSnapshot);
   const route = parseHash(hash);
+  const visibleRoute = sessionActive ? { page: 'session' as const } : route;
   const history = useHistoryRecords();
   return (
     <div className="app-shell">
@@ -27,12 +28,12 @@ export default function App() {
       <div className="application-layout">
         {!sessionActive && <AppNavigation route={route} />}
         <main className="main-content" id="main-content">
-          {route.page === 'dashboard' && <DashboardScreen history={history} />}
-          {route.page === 'inspect' && <InspectScreen key={route.scenarioId ?? 'custom'} initialScenarioId={route.scenarioId} />}
-          {route.page === 'compare' && <CompareScreen key={route.scenarioId ?? 'default'} initialScenarioId={route.scenarioId} />}
-          {route.page === 'session' && <TestSessionScreen onSessionActiveChange={setSessionActive} />}
-          {route.page === 'history' && <HistoryScreen />}
-          {route.page === 'limitations' && <LimitationsScreen />}
+          {visibleRoute.page === 'dashboard' && <DashboardScreen history={history} />}
+          {visibleRoute.page === 'inspect' && <InspectScreen key={visibleRoute.scenarioId ?? 'custom'} initialScenarioId={visibleRoute.scenarioId} />}
+          {visibleRoute.page === 'compare' && <CompareScreen key={visibleRoute.scenarioId ?? 'default'} initialScenarioId={visibleRoute.scenarioId} />}
+          {visibleRoute.page === 'session' && <TestSessionScreen onSessionActiveChange={setSessionActive} />}
+          {visibleRoute.page === 'history' && <HistoryScreen />}
+          {visibleRoute.page === 'limitations' && <LimitationsScreen />}
         </main>
       </div>
     </div>

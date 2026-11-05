@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CSV_COLUMNS, historyToCsv } from '../src/lib/csv';
+import { CSV_COLUMNS, downloadHistoryCsv, historyToCsv } from '../src/lib/csv';
 import { makeDecisionRecord } from '../src/lib/session';
 import { SCENARIOS } from '../src/lib/scenarios';
 
@@ -10,6 +10,16 @@ describe('History CSV export', () => {
     expect(csv.slice(1).split('\r\n')[0].split(',')).toEqual([...CSV_COLUMNS]);
     expect(csv).toContain('\r\n');
     expect(csv).not.toContain('\n\n');
+  });
+
+  it('passes a downloadable CSV with the prescribed filename and MIME type to the browser', () => {
+    let download: { contents: string; filename: string; mimeType: string } | undefined;
+    downloadHistoryCsv([], (contents, filename, mimeType) => {
+      download = { contents, filename, mimeType };
+    });
+    expect(download?.filename).toBe('qrshield-history.csv');
+    expect(download?.mimeType).toBe('text/csv;charset=utf-8');
+    expect(download?.contents.startsWith('\uFEFFparticipant_code,mode,scenario_id')).toBe(true);
   });
 
   it('quotes values, escapes embedded quotes, and neutralizes formula prefixes', () => {

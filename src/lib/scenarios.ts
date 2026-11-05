@@ -1,6 +1,7 @@
 import knownHandlesData from '../data/knownHandles.json';
 import scenariosData from '../data/scenarios.json';
-import { UserContext } from '../config';
+import { LOOKALIKE_MAX_DISTANCE } from '../config';
+import type { UserContext } from '../config';
 import { evaluateRisk, RiskAssessment, Verdict } from './riskRules';
 import { parseUpiPayload, ParsedUpiPayload } from './upiParser';
 
@@ -32,7 +33,7 @@ export const SCENARIOS = scenariosData as Scenario[];
 export const ENGINE_OPTIONS = {
   knownHandles: [...knownHandlesData.knownHandles, ...knownHandlesData.publicBankHandles],
   trustedPayees: knownHandlesData.trustedPayees,
-  lookalikeMaxDistance: 2,
+  lookalikeMaxDistance: LOOKALIKE_MAX_DISTANCE,
 };
 
 const EXPECTED_VERDICTS: Record<string, Verdict> = {

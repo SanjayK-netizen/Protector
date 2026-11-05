@@ -86,7 +86,7 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
   return (
     <section className="workspace-screen">
       <header className="page-header">
-        <div><p className="eyebrow">Payload analysis</p><h1>Inspect a QR payload</h1><p>No camera scanning is available. Paste or select synthetic payload text.</p></div>
+        <div><p className="eyebrow">Payload analysis</p><h1>Inspect a QR payload</h1><p>No camera scanning is available. Use synthetic payload text only.</p></div>
       </header>
       <div className="inspect-layout">
         <section className="panel inspect-controls">
