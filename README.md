@@ -2,7 +2,7 @@
 
 A pre-payment safety check for QR / UPI payment requests. It reads the text inside a QR code, applies seven explainable rules, and shows a plain-language verdict **before** the user pays: **Safe**, **Check first** or **Risky**.
 
-> **Synthetic data only.** Every payee, UPI ID and payment in this repository is made up for testing. The app never makes a real payment, never contacts a bank, and has no network calls, analytics or camera access.
+> **Synthetic data only.** Every payee, UPI ID and payment in this repository is made up for testing. The app never makes a real payment, never contacts a bank, and has no network calls or analytics. Camera scanning and image uploads are processed entirely offline in the browser.
 
 > **Research prototype, not a safety guarantee.** A "Safe" verdict does not prove a payee is genuine. See [Known limitations](#known-limitations).
 
@@ -20,7 +20,7 @@ Built for the School of Innovation (SoI) Innovation Project, Cyber Security vert
 | Automated tests | **93 passed** (9 test files) |
 | Production build | Passes |
 | Human testing with participants | **Not done** |
-| Live camera scanning | **Not built** (`jsqr` is installed but unused) |
+| Live camera scanning | **Built** (offline jsQR decoding with camera stream & image upload fallback) |
 | Real payment verification | **Not built** |
 
 ## Run it
@@ -87,7 +87,7 @@ Full list in [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md). The main ones:
 1. **Critical: an exact copy of a trusted payee's UPI ID is rated Safe (SCEN-10).** A swapped QR that carries the same trusted address looks identical to the real one. Verify the payee independently.
 2. A scammer whose payee name matches their own UPI ID may not be detected.
 3. No human testing has been done. The human-response test (T3) is **not run**.
-4. No live camera scanning and no real payment verification.
+4. No real payment verification (no banking API, payment rail, or live confirmation is contacted). Scanned camera frames and images are decoded strictly offline in the browser.
 5. Amount limits are placeholders. Evidence so far covers students only.
 6. Baseline-first order can bias results; the test session lets you choose the mode order.
 

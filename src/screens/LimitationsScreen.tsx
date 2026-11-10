@@ -6,7 +6,7 @@ export const LIMITATIONS = [
   },
   { severity: 'high', title: 'Matching scammer name and UPI ID may not be detected', detail: 'A fraudulent account whose displayed name matches its own UPI ID can pass the name check.' },
   { severity: 'medium', title: 'Human testing has not been done', detail: 'T3 remains Not run. No participant outcomes or validation claims are available.' },
-  { severity: 'medium', title: 'No live camera scanning', detail: 'Payloads must be selected from synthetic scenarios or entered as text.' },
+  { severity: 'low', title: 'Camera and image QR decoding runs strictly offline', detail: 'Camera video frames and uploaded images are decoded locally in-browser via jsQR with no server validation.' },
   { severity: 'medium', title: 'No real payment verification', detail: 'No banking API, payment rail, or real transaction is contacted.' },
   { severity: 'medium', title: 'Synthetic data only', detail: 'Scenarios and payment details are constructed test data, not live payees.' },
   { severity: 'medium', title: 'Amount limits are unvalidated placeholders', detail: 'Thresholds vary by context but have not been established by user research.' },
