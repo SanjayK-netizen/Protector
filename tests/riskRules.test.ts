@@ -107,6 +107,13 @@ describe('Rule 1 — Payee Name Mismatch', () => {
 // ---------------------------------------------------------------------------
 
 describe('Rule 2 — Unknown UPI Handle', () => {
+  it('does not treat the removed synthetic test handles as recognized by app defaults', () => {
+    const result = evaluateRisk(
+      parseUpiPayload('upi://pay?pa=shop@testbank&pn=Shop&am=50')
+    );
+    expect(result.triggeredRules.some(rule => rule.id === 2)).toBe(true);
+  });
+
   it('triggers for a handle that is not in knownHandles or publicBankHandles', () => {
     const a = assess(
       'upi://pay?pa=scammer@fakebank&pn=Scammer&am=100.00'
@@ -154,7 +161,7 @@ describe('Rule 3 — Look-alike of a Trusted Payee', () => {
     expect(r).toBeDefined();
     expect(r!.code).toBe('LOOKALIKE_PAYEE');
     expect(r!.reason).toContain('canteen@testbank');
-    expect(r!.reason).toContain('a trusted payee');
+    expect(r!.reason).toContain('configured payee address');
   });
 
   it('triggers on look-alike address for retail trusted payee', () => {

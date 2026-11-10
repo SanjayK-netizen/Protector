@@ -13,4 +13,8 @@ describe('App routing', () => {
     expect(parseHash('#/session')).toEqual({ page: 'dashboard' });
     expect(parseHash('#/unknown')).toEqual({ page: 'dashboard' });
   });
+
+  it('does not load a synthetic scenario from a legacy inspect URL', () => {
+    expect(parseHash('#/inspect?scenario=SCEN-05')).toEqual({ page: 'inspect' });
+  });
 });
