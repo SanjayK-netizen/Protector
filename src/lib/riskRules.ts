@@ -21,7 +21,7 @@
  * 7. Urgency wording in the note.
  *
  * Verdict:
- * 0 rules            => Safe
+ * 0 rules            => No risk indicators detected (not verified as safe)
  * 1 rule (not 4 or 6)=> Check first
  * 2+ rules, or 4 / 6 => Risky
  *
@@ -324,7 +324,7 @@ export function evaluateRisk(
             id: 3,
             code: 'LOOKALIKE_PAYEE',
             title: 'Address Looks Like a Trusted Payee',
-            reason: `'${payload.pa}' is very similar to the verified address '${trusted.vpa}' (${trusted.name}) of a trusted payee. This could be an impersonation attempt.`,
+            reason: `'${payload.pa}' is very similar to the configured payee address '${trusted.vpa}' (${trusted.name}). Verify the recipient independently.`,
             severity: 'medium',
           });
           break; // one look-alike warning is sufficient
@@ -400,10 +400,10 @@ export function evaluateRisk(
 
   const recommendedCheck =
     verdict === 'Safe'
-      ? 'Details match a trusted payee. Confirm the amount on screen before paying.'
+      ? 'No configured risk indicators were detected. This does not verify the recipient or prove that this QR code is original. Confirm the payee independently.'
       : verdict === 'Check first'
-        ? 'Something looks off. Ask the payee directly before sending money.'
-        : 'Do not pay. One or more serious fraud indicators were found. Report or reject this request.';
+        ? 'Some risk indicators were found. Verify the recipient and payment details independently before paying.'
+        : 'Several or serious risk indicators were found. Do not pay until you have independently verified the recipient and payment details.';
 
   return {
     verdict,

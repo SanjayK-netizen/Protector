@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { createHistoryStore, HISTORY_LIMIT, HistoryRecord, StorageLike } from '../src/lib/history';
-import { SCENARIOS } from '../src/lib/scenarios';
-import { makeDecisionRecord } from '../src/lib/session';
 
 class MemoryStorage implements StorageLike {
   values = new Map<string, string>();
@@ -11,17 +9,24 @@ class MemoryStorage implements StorageLike {
 }
 
 function record(index = 1): HistoryRecord {
-  return makeDecisionRecord({
-    participantCode: `P${index}`,
-    sessionId: 'session-1',
-    mode: 'baseline',
-    scenario: SCENARIOS[0],
-    decision: 'Pay',
-    followedRecommendedCheck: null,
-    timeToDecisionSeconds: 1.25,
-    explanationText: '',
+  return {
+    participant_code: `P${index}`,
+    mode: 'qrshield',
+    scenario_id: 'custom',
+    ground_truth: '',
+    decision: '',
+    decision_correct: '',
+    followed_recommended_check: null,
+    time_to_decision_seconds: '',
+    explanation_text: '',
+    record_type: 'inspect',
+    session_id: '',
     timestamp: '2026-01-01T00:00:00.000Z',
-  });
+    context: 'general',
+    engine_verdict: 'Safe',
+    triggered_rules: [],
+    consent_given: null,
+  };
 }
 
 describe('Local history store', () => {

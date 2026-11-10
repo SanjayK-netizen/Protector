@@ -5,9 +5,9 @@ interface VerdictBadgeProps {
 }
 
 export function verdictLabel(verdict: Verdict): string {
-  if (verdict === 'Safe') return 'SAFE';
-  if (verdict === 'Check first') return 'CHECK FIRST';
-  return 'RISKY';
+  if (verdict === 'Safe') return 'NO INDICATORS FOUND';
+  if (verdict === 'Check first') return 'VERIFY FIRST';
+  return 'SUSPICIOUS';
 }
 
 export function VerdictBadge({ verdict }: VerdictBadgeProps) {

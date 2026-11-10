@@ -1,16 +1,15 @@
 # QRShield limitations
 
-QRShield is an offline research prototype using synthetic data. It does not guarantee that a payment destination is safe.
+QRShield applies offline heuristics to QR payload text. It cannot verify the identity of a payee or determine whether a code is the original.
 
-1. **Critical — an exact copy of a trusted payee's UPI ID is rated SAFE (SCEN-10).** The engine cannot distinguish an authentic QR code from an exact copy that carries the same trusted address. Verify the payee independently.
-2. A scammer whose displayed payee name matches their own UPI ID may not be detected.
-3. Human testing has not been done; T3 remains **Not run**.
-4. Scanned QR codes and camera feeds are processed strictly client-side via jsQR; no banking API, payment rail, or live payment verification is integrated.
-5. No real payment verification, banking API, or live payment rail is integrated.
-6. Synthetic data only; no live participant records or real payees are included by default.
-7. Amount limits are unvalidated placeholders and have not been established by user research.
-8. Evidence so far covers students only; findings should not be generalized to employees, merchants, or the public.
-9. Baseline-first order can bias results; mode order can be selected in the test session.
-10. History lives only in this browser and may be cleared or unavailable when browser storage is blocked.
+1. **No authoritative identity or QR verification.** The app does not contact a bank, merchant, payment network, or trusted registry. A copied QR code can carry the same payload as an original.
+2. **No result proves a code genuine or fake.** “No indicators found” means the configured checks did not match. “Suspicious” means risk patterns were found, not that fraud is confirmed.
+3. **Handle lists may be incomplete or outdated.** A listed UPI handle does not validate the specific account or payee.
+4. **No merchant payees are preconfigured.** Look-alike checks only work when a trusted-payee list is supplied by a reliable source.
+5. **A matching displayed name and UPI ID can still be deceptive.** The app cannot determine who controls an account.
+6. **Amount limits are placeholders.** They have not been established by user research.
+7. **No human testing has been done.** The app has not been validated as effective at preventing harmful payments.
+8. **Camera QR decoding runs locally via jsQR.** No banking API, payment rail, or live payment verification is integrated.
+9. **History exists only in this browser.** Local storage can be cleared or blocked; exported records may contain old research-session data.
 
-The prototype has no network submission or analytics; camera access and QR image decoding are processed entirely offline within the browser.
+Do not treat QRShield as the sole basis for making a payment. Confirm the recipient and amount independently using a trusted channel.

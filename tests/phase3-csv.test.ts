@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { CSV_COLUMNS, downloadHistoryCsv, historyToCsv } from '../src/lib/csv';
-import { makeDecisionRecord } from '../src/lib/session';
-import { SCENARIOS } from '../src/lib/scenarios';
+import type { HistoryRecord } from '../src/lib/history';
+
+function makeRecord(overrides: Partial<HistoryRecord> = {}): HistoryRecord {
+  return {
+    participant_code: '',
+    mode: 'qrshield',
+    scenario_id: 'custom',
+    ground_truth: '',
+    decision: '',
+    decision_correct: '',
+    followed_recommended_check: null,
+    time_to_decision_seconds: '',
+    explanation_text: '',
+    record_type: 'inspect',
+    session_id: '',
+    timestamp: '2026-01-01T00:00:00.000Z',
+    context: 'general',
+    engine_verdict: '',
+    triggered_rules: [],
+    consent_given: null,
+    ...overrides,
+  };
+}
 
 describe('History CSV export', () => {
   it('uses the required column order and UTF-8 BOM with CRLF line endings', () => {
@@ -41,16 +62,9 @@ describe('History CSV export', () => {
   });
 
   it('quotes values, escapes embedded quotes, and neutralizes formula prefixes', () => {
-    const record = makeDecisionRecord({
-      participantCode: '=1+1',
-      sessionId: 'session-1',
-      mode: 'qrshield',
-      scenario: { ...SCENARIOS[0], title: 'test' },
-      decision: 'Pay',
-      followedRecommendedCheck: true,
-      timeToDecisionSeconds: 1,
-      explanationText: '=@SUM("x")',
-      timestamp: '2026-01-01T00:00:00.000Z',
+    const record = makeRecord({
+      participant_code: '=1+1',
+      explanation_text: '=@SUM("x")',
     });
     const csv = historyToCsv([record]);
     expect(csv).toContain("\"'=1+1\"");
@@ -58,15 +72,8 @@ describe('History CSV export', () => {
   });
 
   it('leaves verdict, rules, and recommendation fields blank for baseline rows', () => {
-    const record = makeDecisionRecord({
-      participantCode: 'P01',
-      sessionId: 'session-1',
+    const record = makeRecord({
       mode: 'baseline',
-      scenario: SCENARIOS[0],
-      decision: "Don't pay",
-      followedRecommendedCheck: null,
-      timeToDecisionSeconds: 2,
-      explanationText: 'not stored in baseline',
     });
     const row = historyToCsv([record]).split('\r\n')[1];
     expect(row).toContain('"baseline"');

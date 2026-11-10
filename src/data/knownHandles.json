@@ -1,11 +1,6 @@
 {
-  "_comment": "Synthetic test handles and widely used public bank handles. This list needs review before any real-world use.",
-  "knownHandles": [
-    "testbank",
-    "testupi",
-    "oktestbank",
-    "studentbank"
-  ],
+  "_comment": "Public UPI handles are a convenience list, not an authoritative or current verification source.",
+  "knownHandles": [],
   "publicBankHandles": [
     "oksbi",
     "okhdfcbank",
@@ -16,46 +11,5 @@
     "ibl",
     "axl"
   ],
-  "trustedPayees": [
-    {
-      "name": "Campus Canteen",
-      "vpa": "canteen@testbank",
-      "category": "Campus"
-    },
-    {
-      "name": "College Library",
-      "vpa": "library@testbank",
-      "category": "Campus"
-    },
-    {
-      "name": "Hostel Office",
-      "vpa": "hostel.office@testbank",
-      "category": "Campus"
-    },
-    {
-      "name": "Grocery Store",
-      "vpa": "grocery@testbank",
-      "category": "Retail"
-    },
-    {
-      "name": "Electricity Board",
-      "vpa": "electricity@testupi",
-      "category": "Utilities"
-    },
-    {
-      "name": "Mobile Recharge",
-      "vpa": "mobile.recharge@testbank",
-      "category": "Utilities"
-    },
-    {
-      "name": "Office Canteen",
-      "vpa": "office.canteen@testbank",
-      "category": "Workplace"
-    },
-    {
-      "name": "Vendor Accounts",
-      "vpa": "vendor.accounts@testbank",
-      "category": "Workplace"
-    }
-  ]
+  "trustedPayees": []
 }

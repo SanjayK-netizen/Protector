@@ -1,20 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { UserContext } from '../config';
 import { evaluateRisk } from '../lib/riskRules';
 import { parseUpiPayload } from '../lib/upiParser';
-import { SCENARIOS, scenarioById, ENGINE_OPTIONS } from '../lib/scenarios';
-import { BaselineView } from '../components/BaselineView';
 import { PaymentCard } from '../components/PaymentCard';
 import { VerdictPanel } from '../components/VerdictPanel';
-import { verdictLabel } from '../components/VerdictBadge';
-import { historyStore, HistoryRecord } from '../lib/history';
+import { historyStore, type HistoryRecord } from '../lib/history';
 import { CameraScanner } from '../components/CameraScanner';
-
-interface InspectScreenProps {
-  initialScenarioId?: string;
-}
-
-type InspectTab = 'baseline' | 'qrshield';
 
 const contexts: UserContext[] = ['student', 'employee', 'shop_customer', 'merchant', 'general'];
 
@@ -22,7 +13,7 @@ function ruleName(id: number): string {
   return [
     'Payee name mismatch',
     'Unrecognized UPI handle',
-    'Look-alike trusted payee',
+    'Look-alike of a configured payee',
     'Deceptive direction wording',
     'Unusual amount',
     'Non-UPI / URL payload',
@@ -30,87 +21,26 @@ function ruleName(id: number): string {
   ][id - 1];
 }
 
-interface SyntheticPreset {
-  label: string;
-  tag: 'safe' | 'check' | 'risky';
-  payload: string;
-  context: UserContext;
-  description: string;
-}
-
-const EXTRA_PRESETS: SyntheticPreset[] = [
-  {
-    label: 'UPI Collect Request (Attack)',
-    tag: 'risky',
-    payload: 'upi://collect?pa=scammer@testbank&pn=PrizeCollector&am=5000.00&tn=Collect%20request',
-    context: 'general',
-    description: 'Unsupported collect scheme attempting to debit money from user.',
-  },
-  {
-    label: 'Negative Amount (Malformed)',
-    tag: 'risky',
-    payload: 'upi://pay?pa=canteen@testbank&pn=Campus%20Canteen&am=-150.00&cu=INR&tn=Lunch',
-    context: 'student',
-    description: 'Negative transaction amount triggering parser error.',
-  },
-  {
-    label: 'Fine Arts Club (Safe Note)',
-    tag: 'safe',
-    payload: 'upi://pay?pa=finearts@testbank&pn=Fine%20Arts%20Club&am=200.00&cu=INR&tn=Fine%20Arts%20Club%20fee',
-    context: 'student',
-    description: 'Verifies that words like "Fine" do not falsely trigger urgency rule.',
-  },
-];
-
-export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
-  const initial = scenarioById(initialScenarioId) ?? SCENARIOS[0];
-  const [scenarioId, setScenarioId] = useState(initial?.id ?? '');
-  const [payloadText, setPayloadText] = useState(initial?.rawPayload ?? '');
-  const [context, setContext] = useState<UserContext>(initial?.context ?? 'general');
-  const [tab, setTab] = useState<InspectTab>('qrshield');
+export function InspectScreen() {
+  const [payloadText, setPayloadText] = useState('');
+  const [context, setContext] = useState<UserContext>('general');
   const [savedMessage, setSavedMessage] = useState('');
   const [pasteError, setPasteError] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [cameraScannedSuccess, setCameraScannedSuccess] = useState(false);
 
-  const selectedScenario = scenarioById(scenarioId);
-
-  // Real-time evaluation: automatically parses and assesses whenever payloadText or context changes
   const liveInspection = useMemo(() => {
     if (!payloadText.trim()) return null;
     const payload = parseUpiPayload(payloadText);
-    const assessment = evaluateRisk(payload, ENGINE_OPTIONS, context);
-    return { payload, assessment };
+    return { payload, assessment: evaluateRisk(payload, {}, context) };
   }, [payloadText, context]);
-
-  function chooseScenario(id: string) {
-    const scenario = scenarioById(id);
-    setScenarioId(scenario?.id ?? '');
-    if (scenario) {
-      setPayloadText(scenario.rawPayload);
-      setContext(scenario.context);
-      setSavedMessage('');
-      setPasteError('');
-      setCameraScannedSuccess(false);
-    }
-  }
-
-  function applyPreset(preset: SyntheticPreset) {
-    setScenarioId('');
-    setPayloadText(preset.payload);
-    setContext(preset.context);
-    setSavedMessage('');
-    setPasteError('');
-    setCameraScannedSuccess(false);
-  }
 
   async function handlePasteFromClipboard() {
     try {
       setPasteError('');
       const text = await navigator.clipboard.readText();
-      if (text && text.trim()) {
+      if (text.trim()) {
         setPayloadText(text.trim());
-        setScenarioId('');
         setSavedMessage('');
         setCameraScannedSuccess(false);
       } else {
@@ -123,7 +53,6 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
 
   function handleClear() {
     setPayloadText('');
-    setScenarioId('');
     setSavedMessage('');
     setPasteError('');
     setCameraScannedSuccess(false);
@@ -131,7 +60,6 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
 
   function handleCameraScan(scannedData: string) {
     setPayloadText(scannedData);
-    setScenarioId('');
     setSavedMessage('');
     setPasteError('');
     setCameraScannedSuccess(true);
@@ -142,8 +70,8 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
     const row: HistoryRecord = {
       participant_code: '',
       mode: 'qrshield',
-      scenario_id: selectedScenario?.id ?? 'custom',
-      ground_truth: selectedScenario?.groundTruth ?? '',
+      scenario_id: 'custom',
+      ground_truth: '',
       decision: '',
       decision_correct: '',
       followed_recommended_check: null,
@@ -168,21 +96,18 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
     <section className="workspace-screen">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Payload analysis & live camera</p>
+          <p className="eyebrow">Offline payload analysis</p>
           <h1>Inspect a QR payload</h1>
-          <p>
-            Scan a physical QR code with your camera or select synthetic payloads for real-time risk evaluation.
-          </p>
+          <p>Scan a QR code or paste its contents to check for common risk indicators.</p>
         </div>
         {liveInspection && (
-          <div className="live-eval-pill" title="Evaluating rules in real-time">
+          <div className="live-eval-pill" title="Evaluating risk rules in this browser">
             <span className="live-eval-dot" />
-            <span>Live Analysis Active</span>
+            <span>Live analysis active</span>
           </div>
         )}
       </header>
 
-      {/* Camera Scanner Modal Component */}
       <CameraScanner
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
@@ -190,221 +115,96 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
       />
 
       <div className="inspect-layout">
-        {/* Left Input Panel */}
         <section className="panel inspect-controls">
-          {/* Prominent Camera Scan Action Card */}
           <div className="camera-action-card">
             <div className="camera-action-info">
-              <h3>Scan Live QR Code</h3>
-              <p>Point camera at any UPI QR to inspect & verify</p>
+              <h3>Scan a QR code</h3>
+              <p>Camera decoding happens locally in this browser.</p>
             </div>
             <button
               type="button"
               className="primary-button camera-scan-btn"
               onClick={() => setIsScannerOpen(true)}
             >
-              📷 Open Camera
+              Open camera
             </button>
           </div>
 
           {cameraScannedSuccess && (
-            <div className="camera-scanned-banner">
-              <span>✓ QR Code scanned from camera successfully!</span>
-              <button
-                type="button"
-                style={{ background: 'transparent', border: 'none', color: '#a7f3d0', cursor: 'pointer' }}
-                onClick={() => setCameraScannedSuccess(false)}
-              >
-                ✕
-              </button>
+            <div className="camera-scanned-banner" role="status">
+              QR code scanned successfully.
             </div>
           )}
 
-          <h2>Input & Presets</h2>
-
-          {/* Quick-Pick Synthetic Payloads */}
-          <div className="quick-picks-section">
-            <span className="quick-picks-label">Pick a synthetic test scenario:</span>
-            <div className="quick-picks-grid">
-              {SCENARIOS.map(sc => {
-                const tag = sc.groundTruth === 'safe' ? 'safe-tag' : 'risky-tag';
-                const isActive = scenarioId === sc.id;
-                return (
-                  <button
-                    key={sc.id}
-                    type="button"
-                    className={`quick-pick-btn ${tag} ${isActive ? 'active' : ''}`}
-                    onClick={() => chooseScenario(sc.id)}
-                    title={`${sc.id}: ${sc.title} (${sc.context})`}
-                  >
-                    <span>{sc.id}</span>
-                    <span>·</span>
-                    <span>{sc.title.split(' ')[0]}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="quick-picks-section">
-            <span className="quick-picks-label">Edge-case synthetic payloads:</span>
-            <div className="quick-picks-grid">
-              {EXTRA_PRESETS.map((ep, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className={`quick-pick-btn ${ep.tag === 'safe' ? 'safe-tag' : 'risky-tag'}`}
-                  onClick={() => applyPreset(ep)}
-                  title={ep.description}
-                >
-                  <span>{ep.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="field-label" htmlFor="scenario-select">
-            Or select scenario by dropdown
-          </label>
-          <select
-            id="scenario-select"
-            className="text-input"
-            value={scenarioId}
-            onChange={event => chooseScenario(event.target.value)}
-          >
-            <option value="">Custom payload</option>
-            {SCENARIOS.map(scenario => (
-              <option key={scenario.id} value={scenario.id}>
-                {scenario.id} · {scenario.title} ({scenario.groundTruth.toUpperCase()})
-              </option>
-            ))}
-          </select>
-
+          <h2>Payment QR contents</h2>
           <div className="payload-action-bar">
-            <label className="field-label" htmlFor="payload-input">
-              QR payload text
-            </label>
+            <label className="field-label" htmlFor="payload-input">QR payload text</label>
             <div className="action-button-group">
-              <button
-                type="button"
-                className="action-small-btn"
-                onClick={handlePasteFromClipboard}
-                title="Paste payload from system clipboard"
-              >
-                📋 Paste
+              <button type="button" className="action-small-btn" onClick={handlePasteFromClipboard}>
+                Paste
               </button>
-              <button
-                type="button"
-                className="action-small-btn"
-                onClick={handleClear}
-                title="Clear current text"
-              >
-                ✕ Clear
+              <button type="button" className="action-small-btn" onClick={handleClear}>
+                Clear
               </button>
             </div>
           </div>
-
           <textarea
             id="payload-input"
             className="text-input payload-input"
             value={payloadText}
             maxLength={2000}
-            placeholder="Scan with camera, paste, or type upi://pay?... or web link here"
+            placeholder="Scan, paste, or type the contents of a QR code"
             onChange={event => {
               setPayloadText(event.target.value);
-              if (event.target.value !== selectedScenario?.rawPayload) setScenarioId('');
               setSavedMessage('');
               setCameraScannedSuccess(false);
             }}
           />
-
-          {pasteError && <p className="form-error">{pasteError}</p>}
+          {pasteError && <p className="form-error" role="alert">{pasteError}</p>}
 
           <div className="input-meta">
             <span>{payloadText.length} / 2000 characters</span>
-            <label htmlFor="context-select">User type (threshold profile)</label>
+            <label htmlFor="context-select">Context for amount guidance</label>
           </div>
-
           <select
             id="context-select"
             className="text-input"
             value={context}
             onChange={event => {
-              const nextContext = event.target.value as UserContext;
-              setContext(nextContext);
-              if (selectedScenario && nextContext !== selectedScenario.context) setScenarioId('');
+              setContext(event.target.value as UserContext);
               setSavedMessage('');
             }}
           >
             {contexts.map(item => (
-              <option key={item} value={item}>
-                {item.replace('_', ' ')}
-              </option>
+              <option key={item} value={item}>{item.replace('_', ' ')}</option>
             ))}
           </select>
         </section>
 
-        {/* Right Output Panel */}
         <section className="panel inspection-result">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Real-time inspection</p>
-              <h2>Review details & risk badges</h2>
+              <p className="eyebrow">Risk indicator check</p>
+              <h2>Review the payment details</h2>
             </div>
           </div>
-
-          <div className="view-tabs" role="tablist" aria-label="Inspection mode">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'baseline'}
-              className={tab === 'baseline' ? 'selected' : ''}
-              onClick={() => setTab('baseline')}
-            >
-              Baseline view
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'qrshield'}
-              className={tab === 'qrshield' ? 'selected' : ''}
-              onClick={() => setTab('qrshield')}
-            >
-              QRShield view
-            </button>
-          </div>
-
           {!liveInspection ? (
-            <p className="empty-state">
-              Scan a QR code with the camera, paste a payload, or pick any synthetic scenario above to view real-time risk badges and recommendations.
-            </p>
-          ) : tab === 'baseline' ? (
-            <BaselineView payload={liveInspection.payload} />
+            <p className="empty-state">Scan a QR code or enter its payload to see payment details and risk indicators.</p>
           ) : (
             <>
-              {/* Payment details card */}
               <PaymentCard payload={liveInspection.payload} />
-
-              {/* Real-time Verdict & Recommendations Panel */}
               <VerdictPanel assessment={liveInspection.assessment} />
-
-              {/* Real-time Rule Results Breakdown */}
               <section className="rule-table-section">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3>Rule evaluation results</h3>
+                  <h3>Risk indicator details</h3>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    Triggered: {liveInspection.assessment.triggeredRules.length} of 7 rules
+                    Found: {liveInspection.assessment.triggeredRules.length} of 7
                   </span>
                 </div>
-
                 <div className="table-scroll">
                   <table>
                     <thead>
-                      <tr>
-                        <th>Rule</th>
-                        <th>Status</th>
-                        <th>Explainable Reason</th>
-                      </tr>
+                      <tr><th>Check</th><th>Status</th><th>Details</th></tr>
                     </thead>
                     <tbody>
                       {Array.from({ length: 7 }, (_, index) => {
@@ -412,19 +212,13 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
                         const rule = liveInspection.assessment.triggeredRules.find(item => item.id === ruleId);
                         return (
                           <tr key={ruleId} className={rule ? 'selected-row' : ''}>
+                            <td><strong>R{ruleId}</strong> · {ruleName(ruleId)}</td>
                             <td>
-                              <strong>R{ruleId}</strong> · {ruleName(ruleId)}
+                              <span className={`rule-status-badge ${rule ? `triggered-${rule.severity}` : 'pass'}`}>
+                                {rule ? 'Review' : 'No indicator'}
+                              </span>
                             </td>
-                            <td>
-                              {rule ? (
-                                <span className={`rule-status-badge triggered-${rule.severity}`}>
-                                  {rule.severity}
-                                </span>
-                              ) : (
-                                <span className="rule-status-badge pass">Pass</span>
-                              )}
-                            </td>
-                            <td>{rule?.reason ?? 'No indicator found for this rule.'}</td>
+                            <td>{rule?.reason ?? 'No indicator found for this check.'}</td>
                           </tr>
                         );
                       })}
@@ -432,33 +226,6 @@ export function InspectScreen({ initialScenarioId }: InspectScreenProps) {
                   </table>
                 </div>
               </section>
-
-              {selectedScenario && (
-                <div className="answer-key">
-                  <strong>Research answer key</strong>
-                  <span>
-                    Ground truth: {selectedScenario.groundTruth} · Expected:{' '}
-                    {verdictLabel(
-                      selectedScenario.id === 'SCEN-09'
-                        ? 'Check first'
-                        : selectedScenario.knownLimitation
-                          ? 'Safe'
-                          : selectedScenario.groundTruth === 'safe'
-                            ? 'Safe'
-                            : 'Risky'
-                    )}{' '}
-                    {selectedScenario.knownLimitation ? '(known limitation)' : ''}
-                  </span>
-                </div>
-              )}
-
-              {selectedScenario?.knownLimitation && (
-                <div className="limitation-alert" role="alert">
-                  <strong>Known critical limitation:</strong> An exact copy of a trusted payee UPI ID is rated Safe.
-                  Do not treat this result as proof of legitimacy.
-                </div>
-              )}
-
               <div className="save-row">
                 <button type="button" className="secondary-button" onClick={saveToHistory}>
                   Save to history

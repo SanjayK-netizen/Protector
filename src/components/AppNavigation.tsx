@@ -8,8 +8,6 @@ interface AppNavigationProps {
 const items: { page: AppRoute['page']; label: string; icon: string }[] = [
   { page: 'dashboard', label: 'Dashboard', icon: '▦' },
   { page: 'inspect', label: 'Inspect a QR', icon: '⌕' },
-  { page: 'compare', label: 'Compare modes', icon: '⇄' },
-  { page: 'session', label: 'Test session', icon: '▶' },
   { page: 'history', label: 'History & export', icon: '▤' },
   { page: 'limitations', label: 'Limitations', icon: 'ⓘ' },
 ];
@@ -24,9 +22,7 @@ export function AppNavigation({ route }: AppNavigationProps) {
       <div className="navigation-items">
         {items.map(item => {
           const active = route.page === item.page;
-          const href = item.page === 'inspect' || item.page === 'compare'
-            ? formatHash({ page: item.page })
-            : formatHash({ page: item.page } as AppRoute);
+          const href = formatHash({ page: item.page } as AppRoute);
           return (
             <a
               key={item.page}
@@ -40,7 +36,7 @@ export function AppNavigation({ route }: AppNavigationProps) {
           );
         })}
       </div>
-      <p className="navigation-footnote">Offline simulation · Synthetic data only</p>
+      <p className="navigation-footnote">Offline checks · No QR authenticity verification</p>
     </nav>
   );
 }

@@ -36,6 +36,9 @@ export function VerdictPanel({ assessment }: VerdictPanelProps) {
       <p className="recommended-check">
         <strong>Recommended check:</strong> {assessment.recommendedCheck}
       </p>
+      <p className="muted-copy">
+        This result is a risk-pattern check only. It cannot confirm that a QR code is original or prove that it is fake.
+      </p>
     </section>
   );
 }

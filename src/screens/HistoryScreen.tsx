@@ -1,20 +1,21 @@
 import { useMemo, useState } from 'react';
 import { downloadHistoryCsv } from '../lib/csv';
 import { clearHistory, useHistoryRecords } from '../lib/history';
+import { verdictLabel } from '../components/VerdictBadge';
 
 export function HistoryScreen() {
   const records = useHistoryRecords();
-  const [filter, setFilter] = useState<'all' | 'baseline' | 'qrshield'>('all');
+  const [filter, setFilter] = useState<'all' | 'inspect' | 'session'>('all');
   const [search, setSearch] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [message, setMessage] = useState('');
   const filtered = useMemo(() => records.filter(record =>
-    (filter === 'all' || record.mode === filter) &&
+    (filter === 'all' || record.record_type === filter) &&
     `${record.participant_code} ${record.scenario_id} ${record.decision} ${record.explanation_text}`
       .toLowerCase().includes(search.toLowerCase())
   ), [records, filter, search]);
-  const baselineCount = records.filter(record => record.mode === 'baseline').length;
-  const qrshieldCount = records.filter(record => record.mode === 'qrshield').length;
+  const inspectionCount = records.filter(record => record.record_type === 'inspect').length;
+  const previousSessionCount = records.filter(record => record.record_type === 'session').length;
 
   function deleteAll() {
     if (!confirmDelete) {
@@ -33,16 +34,16 @@ export function HistoryScreen() {
       </header>
       <div className="stat-grid history-stats">
         <article className="stat-card"><span>Total records</span><strong>{records.length}</strong></article>
-        <article className="stat-card"><span>Baseline records</span><strong>{baselineCount}</strong></article>
-        <article className="stat-card"><span>QRShield records</span><strong>{qrshieldCount}</strong></article>
+        <article className="stat-card"><span>QR inspections</span><strong>{inspectionCount}</strong></article>
+        <article className="stat-card"><span>Earlier study records</span><strong>{previousSessionCount}</strong></article>
       </div>
       <section className="panel table-panel">
         <div className="history-toolbar">
           <label className="field-label" htmlFor="history-search">Filter records</label>
-          <input id="history-search" className="text-input" value={search} onChange={event => setSearch(event.target.value)} placeholder="Participant, scenario, decision..." />
-          <label className="field-label" htmlFor="history-mode">Mode</label>
+          <input id="history-search" className="text-input" value={search} onChange={event => setSearch(event.target.value)} placeholder="Payload reference, decision..." />
+          <label className="field-label" htmlFor="history-mode">Record type</label>
           <select id="history-mode" className="text-input" value={filter} onChange={event => setFilter(event.target.value as typeof filter)}>
-            <option value="all">All modes</option><option value="baseline">Baseline</option><option value="qrshield">QRShield</option>
+            <option value="all">All records</option><option value="inspect">QR inspections</option><option value="session">Earlier study records</option>
           </select>
           <div className="history-actions">
             <button type="button" className="primary-button" onClick={() => downloadHistoryCsv(records)}>Export CSV</button>
@@ -60,12 +61,14 @@ export function HistoryScreen() {
         </div>
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Time</th><th>Participant</th><th>Consent</th><th>Record / mode</th><th>Scenario</th><th>Decision</th><th>Verdict</th><th>Seconds</th><th>Explanation</th></tr></thead>
+            <thead><tr><th>Time</th><th>Record type</th><th>Payload reference</th><th>Decision</th><th>Verdict</th><th>Seconds</th><th>Explanation</th></tr></thead>
             <tbody>{filtered.map((record, index) => (
               <tr key={`${record.timestamp}-${record.scenario_id}-${index}`}>
-                <td>{record.timestamp}</td><td>{record.participant_code || '—'}</td><td>{record.consent_given === null ? '—' : record.consent_given ? 'Yes' : 'No'}</td>
-                <td>{record.record_type} · {record.mode}</td><td>{record.scenario_id}</td>
-                <td>{record.decision || '—'}</td><td>{record.engine_verdict || '—'}</td>
+                <td>{record.timestamp}</td>
+                <td>{record.record_type === 'session' ? 'Earlier study data' : 'QR inspection'}</td>
+                <td>{record.scenario_id}</td>
+                <td>{record.decision || '—'}</td>
+                <td>{record.engine_verdict ? verdictLabel(record.engine_verdict) : '—'}</td>
                 <td>{record.time_to_decision_seconds === '' ? '—' : record.time_to_decision_seconds}</td><td>{record.explanation_text || '—'}</td>
               </tr>
             ))}</tbody>

@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react';
-import type { ParticipantMode } from '../App';
 import type { UserContext } from '../config';
-import type { Decision } from './session';
 import type { Verdict } from './riskRules';
+
+type ParticipantMode = 'baseline' | 'qrshield';
+type Decision = 'Pay' | "Don't pay" | 'Verify first';
 
 export const HISTORY_KEY = 'qrshield.phase3.history.v1';
 export const HISTORY_LIMIT = 5000;
